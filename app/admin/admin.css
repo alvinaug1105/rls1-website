@@ -1,0 +1,257 @@
+.admin-login {
+  min-height: 90vh;
+  max-width: 520px;
+  margin: auto;
+  padding: 56px 20px;
+}
+.admin-login > .brand {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 36px;
+}
+.login-card {
+  padding: 36px;
+}
+.login-card h1 {
+  font-size: 36px;
+  margin: 12px 0;
+}
+.login-card form {
+  margin-top: 28px;
+}
+.login-card form > .primary {
+  width: 100%;
+  justify-content: center;
+}
+.password-field {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.password-field input {
+  min-width: 0;
+  flex: 1;
+}
+.admin-back {
+  display: block;
+  margin-top: 24px;
+  color: #a9b7ca;
+}
+.admin-header {
+  min-height: 88px;
+  border-bottom: 1px solid #293447;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 20px 32px;
+  background: #101824;
+}
+.admin-header .brand {
+  margin-right: auto;
+}
+.admin-identity {
+  color: #9caec5;
+  font-size: 13px;
+}
+.admin-layout {
+  display: grid;
+  grid-template-columns: 224px minmax(0, 1fr);
+  max-width: 1700px;
+  margin: auto;
+}
+.admin-sidebar {
+  padding: 28px 20px;
+  border-right: 1px solid #293447;
+}
+.admin-sidebar .eyebrow {
+  margin: 22px 12px 8px;
+  font-size: 10px;
+}
+.admin-sidebar a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #acbad0;
+}
+.admin-sidebar a[aria-current='page'] {
+  background: #fc44371c;
+  color: #fff;
+  border-left: 3px solid #fc4437;
+}
+.admin-sidebar a:hover {
+  background: #1d293c;
+}
+.admin-sidebar > .footnote {
+  padding: 24px 12px;
+}
+.admin-main {
+  width: 100%;
+  min-width: 0;
+  padding: 32px;
+  max-width: none;
+  margin: 0;
+}
+.admin-title {
+  margin-bottom: 28px;
+}
+.admin-title h1 {
+  font-size: 32px;
+  margin: 8px 0;
+}
+.admin-main > .panel {
+  margin-bottom: 20px;
+}
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.admin-stats h2 {
+  font-size: 25px;
+  margin: 14px 0;
+  overflow-wrap: anywhere;
+}
+.admin-stats span {
+  font-size: 13px;
+  color: #fc746b;
+}
+.admin-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 22px;
+}
+.admin-menu {
+  display: none;
+}
+.admin-count {
+  background: #fc4437;
+  border-radius: 20px;
+  padding: 0 7px;
+  font-size: 12px;
+  color: white;
+}
+.admin-main .panel {
+  min-width: 0;
+}
+.admin-main .review {
+  overflow-wrap: anywhere;
+}
+.admin-main .formactions {
+  flex-wrap: wrap;
+}
+.admin-main input,
+.admin-main textarea,
+.admin-main select {
+  max-width: 100%;
+}
+.admin-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 20px 0;
+}
+.admin-tabs button[aria-pressed='true'] {
+  background: #fc4437;
+  color: white;
+}
+.admin-main .storybody {
+  white-space: pre-wrap;
+}
+.admin-post-list {
+  display: grid;
+  gap: 16px;
+}
+.admin-main .desk-post {
+  margin: 0;
+}
+.admin-notice-preview {
+  white-space: pre-wrap;
+}
+.admin-main .editor-scroll {
+  max-width: 100%;
+}
+@media (min-width: 1400px) {
+  .admin-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (max-width: 767px) {
+  .admin-header {
+    padding: 16px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .admin-header .brand {
+    width: calc(100% - 140px);
+  }
+  .admin-identity {
+    font-size: 11px;
+  }
+  .admin-header .outline {
+    min-height: 42px;
+  }
+  .admin-layout {
+    display: block;
+  }
+  .admin-menu {
+    display: flex;
+    margin: 16px;
+  }
+  .admin-sidebar {
+    display: none;
+    border-bottom: 1px solid #293447;
+    border-right: 0;
+    padding-top: 0;
+  }
+  .admin-sidebar.is-open {
+    display: block;
+  }
+  .admin-main {
+    padding: 8px 16px 32px;
+  }
+  .admin-title h1 {
+    font-size: 28px;
+  }
+  .admin-stats {
+    grid-template-columns: 1fr;
+  }
+  .admin-main .panel {
+    padding: 20px;
+  }
+  .admin-shortcuts {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .login-card {
+    padding: 24px;
+  }
+  .admin-login {
+    padding-top: 32px;
+  }
+}
+.admin-main fieldset {
+  min-inline-size: 0;
+  width: 100%;
+}
+.admin-main .result-editor [data-slot='table-container'] {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.admin-main .row-errors {
+  white-space: normal;
+  max-width: 260px;
+  color: #ffaaa3;
+  font-size: 12px;
+  margin: 6px 0;
+}
+.admin-main .editor-savebar {
+  flex-wrap: wrap;
+}
+.admin-main .result-editor .footnote {
+  white-space: normal;
+}
