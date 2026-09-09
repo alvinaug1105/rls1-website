@@ -121,44 +121,68 @@ export function events(data: Entry[]): EventInfo[] {
     }
   });
 }
-export function eventStatus(event: EventInfo, data: Entry[]) {
+export const RACE_TIME_ZONE = 'Asia/Hong_Kong';
+const raceClock = new Intl.DateTimeFormat('en-CA', {
+  timeZone: RACE_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  hourCycle: 'h23',
+});
+export function raceDayClock(now: number) {
+  const parts = raceClock.formatToParts(now);
+  const part = (type: string) => parts.find((p) => p.type === type)!.value;
+  return {
+    date: `${part('year')}-${part('month')}-${part('day')}`,
+    hour: Number(part('hour')),
+  };
+}
+export function eventStatus(event: EventInfo, data: Entry[], now?: number) {
   if (
     data.some(
       (e) =>
-        e.approved && e.kind === 'race' && roundNumber(e.title) === event.round,
+        e.approved === 1 &&
+        e.kind === 'race' &&
+        roundNumber(e.title) === event.round,
     )
   )
     return 'FINISHED';
-  return (
-    event.status ||
-    (data.some(
+  // Explicit live racing must never be moved backwards by the qualifying clock.
+  if (event.status === 'LIVE') return 'LIVE';
+  if (now !== undefined) {
+    const clock = raceDayClock(now);
+    if (event.date === clock.date && clock.hour >= 21) return 'QUALIFYING';
+  }
+  if (event.status && event.status !== 'UPCOMING') return event.status;
+  if (
+    !event.status &&
+    data.some(
       (e) =>
-        e.approved &&
+        e.approved === 1 &&
         e.kind === 'qualifying' &&
         roundNumber(e.title) === event.round,
     )
-      ? 'QUALIFYING'
-      : 'UPCOMING')
-  );
+  )
+    return 'QUALIFYING';
+  if (now !== undefined && event.date === raceDayClock(now).date)
+    return 'RACE DAY';
+  return 'UPCOMING';
 }
 export function nextEvent(data: Entry[], now: number) {
-  const today = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Hong_Kong',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now);
-  const available = events(data)
-    .filter((e) => eventStatus(e, data) !== 'FINISHED')
-    .sort(
-      (a, b) =>
-        Date.parse(a.startAt || a.date + 'T00:00:00+08:00') -
-        Date.parse(b.startAt || b.date + 'T00:00:00+08:00'),
-    );
+  const today = raceDayClock(now).date;
+  const ordered = events(data).sort(
+    (a, b) =>
+      a.date.localeCompare(b.date) ||
+      (a.startAt || '').localeCompare(b.startAt || '') ||
+      a.round - b.round,
+  );
+  // Keep today's event even after its start time or official completion.
+  // Advance only when the Hong Kong calendar date changes.
   return (
-    available.find((e) => eventStatus(e, data) === 'LIVE') ||
-    available.find((e) =>
-      e.startAt ? Date.parse(e.startAt) >= now : e.date >= today,
+    ordered.find((e) => e.date === today) ||
+    ordered.find(
+      (e) => e.date > today && eventStatus(e, data, now) !== 'FINISHED',
     )
   );
 }

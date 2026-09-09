@@ -6,6 +6,8 @@ import {
   dateLabel,
   raceEntries,
   classification,
+  raceDayClock,
+  RACE_TIME_ZONE,
 } from './racing';
 import { roundNumber, schedule } from './season';
 import { useClock, EmptyState } from './race-ui';
@@ -31,7 +33,11 @@ export function Dashboard({
     <>
       <div className="dashboard-grid">
         <section className="panel next-race">
-          <p className="eyebrow">NEXT UP</p>
+          <p className="eyebrow">
+            {next && now !== null && next.date === raceDayClock(now).date
+              ? 'TODAY’S RACE'
+              : 'NEXT UP'}
+          </p>
           {now === null ? (
             <div className="loading-skeleton" aria-live="polite">
               Loading event schedule…
@@ -43,7 +49,7 @@ export function Dashboard({
                   ROUND {String(next.round).padStart(2, '0')}
                 </span>
                 <span className="badge verified">
-                  {eventStatus(next, data)}
+                  {eventStatus(next, data, now)}
                 </span>
               </div>
               <h2>{next.country}</h2>
@@ -52,10 +58,11 @@ export function Dashboard({
                 <>
                   <p className="muted">
                     {new Intl.DateTimeFormat('en-GB', {
+                      timeZone: RACE_TIME_ZONE,
                       dateStyle: 'medium',
                       timeStyle: 'short',
                     }).format(new Date(next.startAt))}{' '}
-                    · your local time
+                    · Hong Kong time
                   </p>
                   {seconds !== null && seconds > 0 && (
                     <p

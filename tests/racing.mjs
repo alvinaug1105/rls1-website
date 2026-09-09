@@ -141,3 +141,116 @@ assert.deepEqual(
 console.log(
   'PASS: archive preservation, WDC/WCC, wins/podiums/gaps, progression, event selection/status, ICS dates/timezones, lap validation, duplicate/position validation, recaps and penalty isolation.',
 );
+
+// Race-day behavior always uses the schedule date in Hong Kong, independent
+// of visitor timezone and even after the confirmed start has passed.
+const todayEvent = season.schedule[6];
+const followingEvent = season.schedule[7];
+const instant = (date, time) => Date.parse(`${date}T${time}+08:00`);
+const eventOverride = {
+  id: 'test-event-clock',
+  kind: 'event',
+  approved: 1,
+  title: season.roundTitle(todayEvent.round),
+  author: 'Test',
+  created: '',
+  body: JSON.stringify({
+    date: todayEvent.date,
+    startAt: `${todayEvent.date}T18:00:00+08:00`,
+    status: 'UPCOMING',
+  }),
+};
+const clockData = [...season.archive, eventOverride];
+const scheduled = racing
+  .events(clockData)
+  .find((e) => e.round === todayEvent.round);
+for (const time of ['00:00:00', '20:59:59', '21:00:00', '23:59:59']) {
+  assert.equal(
+    racing.nextEvent(clockData, instant(todayEvent.date, time)).round,
+    todayEvent.round,
+  );
+}
+assert.equal(
+  racing.eventStatus(
+    scheduled,
+    clockData,
+    instant(todayEvent.date, '20:59:59'),
+  ),
+  'RACE DAY',
+);
+assert.equal(
+  racing.eventStatus(
+    scheduled,
+    clockData,
+    instant(todayEvent.date, '21:00:00'),
+  ),
+  'QUALIFYING',
+);
+assert.equal(
+  racing.eventStatus(
+    scheduled,
+    clockData,
+    instant(todayEvent.date, '23:59:59'),
+  ),
+  'QUALIFYING',
+);
+const midnightAfter = instant(todayEvent.date, '00:00:00') + 86400000;
+assert.equal(
+  racing.nextEvent(clockData, midnightAfter).round,
+  followingEvent.round,
+);
+assert.equal(
+  racing.raceDayClock(instant(todayEvent.date, '00:00:00')).date,
+  todayEvent.date,
+);
+const finishedData = [
+  ...clockData,
+  { ...eventOverride, id: 'test-race-completed', kind: 'race', body: '[]' },
+];
+assert.equal(
+  racing.nextEvent(finishedData, instant(todayEvent.date, '22:00:00')).round,
+  todayEvent.round,
+);
+assert.equal(
+  racing.eventStatus(
+    scheduled,
+    finishedData,
+    instant(todayEvent.date, '22:00:00'),
+  ),
+  'FINISHED',
+);
+assert.equal(
+  racing.eventStatus(
+    { ...scheduled, status: 'LIVE' },
+    clockData,
+    instant(todayEvent.date, '22:00:00'),
+  ),
+  'LIVE',
+);
+const futureLive = {
+  ...eventOverride,
+  id: 'test-future-live',
+  title: season.roundTitle(followingEvent.round),
+  body: JSON.stringify({ date: followingEvent.date, status: 'LIVE' }),
+};
+assert.equal(
+  racing.nextEvent(
+    [...clockData, futureLive],
+    instant(todayEvent.date, '22:00:00'),
+  ).round,
+  todayEvent.round,
+);
+const rescheduled = {
+  ...eventOverride,
+  body: JSON.stringify({ date: followingEvent.date, status: 'UPCOMING' }),
+};
+assert.notEqual(
+  racing.nextEvent(
+    [...season.archive, rescheduled],
+    instant(todayEvent.date, '22:00:00'),
+  ).date,
+  todayEvent.date,
+);
+console.log(
+  'PASS: Hong Kong race-day priority, elapsed start time, 21:00 qualifying boundary, midnight rollover, published completion, live precedence and schedule overrides.',
+);
