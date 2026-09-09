@@ -1,5 +1,5 @@
 'use client';
-import Link from 'next/link';
+import { BrowserLink as Link } from './browser-link';
 import { useState, useEffect } from 'react';
 import { Dashboard } from './dashboard';
 import { Championship } from './championship';

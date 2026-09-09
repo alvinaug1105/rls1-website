@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
+import { BrowserLink as Link } from '../browser-link';
 import { useClock } from '../race-ui';
 import { Flag, ShieldCheck, ArrowUpRight, LogOut, Menu } from 'lucide-react';
 import { useLeague } from '../league';
@@ -56,7 +56,7 @@ export function AdminLogin() {
   }
   return (
     <main className="admin-login">
-      <Link prefetch={false} className="brand" href="/">
+      <Link className="brand" href="/">
         <Flag /> RLS1 <span>eSPORTS</span>
       </Link>
       <section className="panel login-card">
@@ -104,7 +104,7 @@ export function AdminLogin() {
             {busy ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
-        <Link prefetch={false} className="admin-back" href="/">
+        <Link className="admin-back" href="/">
           ← Return to the public site
         </Link>
       </section>
@@ -200,11 +200,11 @@ export function AdminPortal({
       }}
     >
       <header className="admin-header">
-        <Link prefetch={false} href="/admin" className="brand">
+        <Link href="/admin" className="brand">
           <Flag /> RLS1 <span>ADMIN</span>
         </Link>
         <span className="admin-identity">Logged in as Organiser</span>
-        <Link prefetch={false} href="/" className="outline">
+        <Link href="/" className="outline">
           Public site <ArrowUpRight size={15} />
         </Link>
         <button className="outline" onClick={() => logout()} disabled={busy}>
@@ -232,7 +232,6 @@ export function AdminPortal({
                 <p className="eyebrow">{group}</p>
               )}
               <Link
-                prefetch={false}
                 href={href(id)}
                 aria-current={section === id ? 'page' : undefined}
               >
@@ -278,11 +277,7 @@ export function AdminPortal({
               {section === 'dashboard' && (
                 <>
                   <div className="admin-stats">
-                    <Link
-                      prefetch={false}
-                      className="panel"
-                      href="/admin/events"
-                    >
+                    <Link className="panel" href="/admin/events">
                       <p className="eyebrow">NEXT EVENT</p>
                       <h2>
                         {upcoming
@@ -292,11 +287,7 @@ export function AdminPortal({
                       <p>{upcoming?.country || 'No upcoming event'}</p>
                       <span>Edit event →</span>
                     </Link>
-                    <Link
-                      prefetch={false}
-                      className="panel"
-                      href="/admin/standings"
-                    >
+                    <Link className="panel" href="/admin/standings">
                       <p className="eyebrow">CHAMPIONSHIP</p>
                       <h2>
                         {latest
@@ -306,20 +297,12 @@ export function AdminPortal({
                       <p>Latest published race</p>
                       <span>View standings →</span>
                     </Link>
-                    <Link
-                      prefetch={false}
-                      className="panel"
-                      href="/admin/results"
-                    >
+                    <Link className="panel" href="/admin/results">
                       <p className="eyebrow">LATEST RESULT</p>
                       <h2>{latest ? latest.title : 'No results yet'}</h2>
                       <span>Manage results →</span>
                     </Link>
-                    <Link
-                      prefetch={false}
-                      className="panel"
-                      href="/admin/submissions"
-                    >
+                    <Link className="panel" href="/admin/submissions">
                       <p className="eyebrow">PENDING REVIEW</p>
                       <h2>{pending}</h2>
                       <p>Guest submissions</p>
@@ -331,12 +314,7 @@ export function AdminPortal({
                     <h2>Manage your league</h2>
                     <div className="admin-shortcuts">
                       {modules.slice(1).map(([id, label]) => (
-                        <Link
-                          prefetch={false}
-                          className="outline"
-                          href={href(id)}
-                          key={id}
-                        >
+                        <Link className="outline" href={href(id)} key={id}>
                           {label} →
                         </Link>
                       ))}
