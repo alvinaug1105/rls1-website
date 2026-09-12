@@ -62,10 +62,7 @@ assert.equal(
   racing.nextEvent(season.archive, Date.parse('2027-02-01T12:00:00Z')),
   undefined,
 );
-assert.equal(
-  racing.eventStatus(season.schedule[5], season.archive),
-  'QUALIFYING',
-);
+assert.equal(racing.eventStatus(season.schedule[5], season.archive), 'DUEL');
 assert.equal(
   racing.eventStatus(season.schedule[0], season.archive),
   'FINISHED',
@@ -176,7 +173,7 @@ assert.equal(
     clockData,
     instant(todayEvent.date, '20:59:59'),
   ),
-  'RACE DAY',
+  'RACE WEEK',
 );
 assert.equal(
   racing.eventStatus(
@@ -194,7 +191,7 @@ assert.equal(
   ),
   'QUALIFYING',
 );
-const midnightAfter = instant(todayEvent.date, '00:00:00') + 86400000;
+const midnightAfter = instant(todayEvent.date, '00:00:00') + 5 * 86400000;
 assert.equal(
   racing.nextEvent(clockData, midnightAfter).round,
   followingEvent.round,
@@ -253,4 +250,193 @@ assert.notEqual(
 );
 console.log(
   'PASS: Hong Kong race-day priority, elapsed start time, 21:00 qualifying boundary, midnight rollover, published completion, live precedence and schedule overrides.',
+);
+
+const duels = load('app/duel.ts');
+const weekStart = instant(todayEvent.date, '00:00:00');
+for (let day = 0; day < 5; day++) {
+  assert.equal(
+    racing.getCurrentLeagueRound(
+      clockData,
+      weekStart + day * 86400000 + 12 * 3600000,
+    ).round,
+    todayEvent.round,
+  );
+  assert.equal(
+    racing.getCurrentLeagueRound(
+      finishedData,
+      weekStart + day * 86400000 + 12 * 3600000,
+    ).round,
+    todayEvent.round,
+  );
+}
+assert.equal(
+  racing.getCurrentLeagueRound(clockData, weekStart + 5 * 86400000 - 1).round,
+  todayEvent.round,
+);
+for (const day of [5, 6])
+  assert.equal(
+    racing.getCurrentLeagueRound(clockData, weekStart + day * 86400000).round,
+    followingEvent.round,
+  );
+const qualifiers = Array.from({ length: 10 }, (_, i) => ({
+  driver: `Qualifier ${i + 1}`,
+  team: 'Test team',
+  ms: 60000 + i * 1000,
+  attempts: 1,
+}));
+const duelQual = {
+  ...eventOverride,
+  id: 'test-qual',
+  kind: 'qualifying',
+  body: JSON.stringify(qualifiers),
+};
+const withQ = [...clockData, duelQual];
+const seeds = duels.duelSeeds(withQ, todayEvent.round);
+assert.equal(seeds.length, 8);
+assert.deepEqual(
+  duels
+    .duelBracket(seeds)
+    .slice(0, 4)
+    .map((m) => m.players.map((p) => p.driver)),
+  [
+    ['Qualifier 1', 'Qualifier 8'],
+    ['Qualifier 4', 'Qualifier 5'],
+    ['Qualifier 2', 'Qualifier 7'],
+    ['Qualifier 3', 'Qualifier 6'],
+  ],
+);
+let record = {
+  round: todayEvent.round,
+  qualifyingBody: duelQual.body,
+  winners: {
+    QF1: 'Qualifier 1',
+    QF2: 'Qualifier 4',
+    QF3: 'Qualifier 2',
+    QF4: 'Qualifier 3',
+  },
+  laps: { 'Qualifier 1': 61500 },
+};
+assert.deepEqual(
+  duels.duelBracket(seeds, record.winners)[4].players.map((p) => p.driver),
+  ['Qualifier 1', 'Qualifier 4'],
+);
+record = {
+  ...record,
+  winners: {
+    ...record.winners,
+    SF1: 'Qualifier 1',
+    SF2: 'Qualifier 2',
+    FINAL: 'Qualifier 2',
+  },
+};
+assert.equal(
+  duels.duelBracket(seeds, record.winners)[6].winner.driver,
+  'Qualifier 2',
+);
+assert.doesNotThrow(() => duels.validateDuel(record, withQ, todayEvent.round));
+for (const winners of [
+  { QF1: 'Qualifier 2' },
+  { SF1: 'Qualifier 1' },
+  { ...record.winners, FINAL: 'Qualifier 3' },
+])
+  assert.throws(() =>
+    duels.validateDuel({ ...record, winners }, withQ, todayEvent.round),
+  );
+for (const ms of [-1, 0, 1.5, '1:00.000'])
+  assert.throws(() =>
+    duels.validateDuel(
+      { ...record, laps: { 'Qualifier 1': ms } },
+      withQ,
+      todayEvent.round,
+    ),
+  );
+assert.throws(() => duels.validateDuel(record, clockData, todayEvent.round));
+assert.throws(() =>
+  duels.validateDuel(
+    record,
+    [...clockData, { ...duelQual, approved: 0 }],
+    todayEvent.round,
+  ),
+);
+assert.throws(() =>
+  duels.validateDuel({ ...record, round: '7' }, withQ, todayEvent.round),
+);
+assert.throws(() => duels.validateDuel(record, withQ, 25));
+assert.throws(() =>
+  duels.validateDuel(
+    { ...record, qualifyingBody: 'changed' },
+    withQ,
+    todayEvent.round,
+  ),
+);
+assert.equal(
+  duels.duelSeeds(
+    [
+      ...clockData,
+      { ...duelQual, body: JSON.stringify([qualifiers[0], qualifiers[0]]) },
+    ],
+    todayEvent.round,
+  ).length,
+  0,
+);
+assert.equal(
+  duels.duelSeeds(
+    [...clockData, { ...duelQual, body: '[{"driver":"Missing time"}]' }],
+    todayEvent.round,
+  ).length,
+  0,
+);
+for (const size of [2, 3, 4, 5, 6, 7]) {
+  const smallData = [
+    ...clockData,
+    { ...duelQual, body: JSON.stringify(qualifiers.slice(0, size)) },
+  ];
+  const smallSeeds = duels.duelSeeds(smallData, todayEvent.round);
+  const winners = {};
+  for (const id of duels.matchIds) {
+    const m = duels.duelBracket(smallSeeds, winners).find((x) => x.id === id);
+    if (m.ready && m.players.length === 2) winners[id] = m.players[0].driver;
+  }
+  assert.ok(duels.duelBracket(smallSeeds, winners)[6].winner);
+  assert.doesNotThrow(() =>
+    duels.validateDuel(
+      {
+        ...record,
+        qualifyingBody: JSON.stringify(qualifiers.slice(0, size)),
+        winners,
+        laps: {},
+      },
+      smallData,
+      todayEvent.round,
+    ),
+  );
+}
+assert.equal(duels.duelBracket([qualifiers[0]])[6].winner, undefined);
+assert.equal(
+  racing.eventStatus(scheduled, withQ, weekStart + 20 * 3600000),
+  'DUEL',
+);
+assert.equal(
+  racing.eventStatus(scheduled, withQ, weekStart + 22 * 3600000),
+  'DUEL',
+);
+const withDuel = [
+  ...withQ,
+  { ...duelQual, kind: 'duel', id: 'duel-test', body: JSON.stringify(record) },
+];
+assert.equal(
+  racing.eventStatus(scheduled, withDuel, weekStart + 22 * 3600000),
+  'RACE',
+);
+assert.equal(
+  racing.getCurrentLeagueRound(withDuel, weekStart + 4 * 86400000).round,
+  todayEvent.round,
+);
+assert.deepEqual(
+  racing.calculateStandings(withDuel),
+  racing.calculateStandings(clockData),
+);
+console.log(
+  'PASS: Wednesday–Sunday race week, Monday/Tuesday rollover, published stage precedence, top-eight bracket, byes, progression, invalid selections/laps, qualifying dependency and points isolation.',
 );

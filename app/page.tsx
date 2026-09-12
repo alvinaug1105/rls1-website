@@ -1,4 +1,6 @@
 'use client';
+import { nextEvent } from './racing';
+import { useClock } from './race-ui';
 import { BrowserLink as Link } from './browser-link';
 import { useState, useEffect } from 'react';
 import { Dashboard } from './dashboard';
@@ -27,8 +29,12 @@ const views = [
 ];
 export default function Home() {
   const [tab, setTab] = useState('home');
-  const [round, setRound] = useState(6);
+  const [selectedRound, setRound] = useState<number | null>(null);
   const league = useLeague();
+  const now = useClock();
+  const round =
+    selectedRound ??
+    (now === null ? 1 : (nextEvent(league.data, now)?.round ?? 24));
   useEffect(() => {
     const apply = () => {
       const match = location.hash.match(/^#round-(\d+)$/);

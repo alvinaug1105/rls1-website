@@ -6,7 +6,7 @@ import {
   dateLabel,
   raceEntries,
   classification,
-  raceDayClock,
+  raceWeekWindow,
   RACE_TIME_ZONE,
 } from './racing';
 import { roundNumber, schedule } from './season';
@@ -34,8 +34,11 @@ export function Dashboard({
       <div className="dashboard-grid">
         <section className="panel next-race">
           <p className="eyebrow">
-            {next && now !== null && next.date === raceDayClock(now).date
-              ? 'TODAY’S RACE'
+            {next &&
+            now !== null &&
+            now >= raceWeekWindow(next).start &&
+            now < raceWeekWindow(next).end
+              ? 'CURRENT RACE WEEK'
               : 'NEXT UP'}
           </p>
           {now === null ? (
@@ -87,7 +90,7 @@ export function Dashboard({
                 <p className="muted">Start time to be announced</p>
               )}
               <button className="primary" onClick={() => onEvent(next.round)}>
-                View event →
+                View round →
               </button>
             </>
           ) : (

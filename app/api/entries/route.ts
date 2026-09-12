@@ -1,11 +1,13 @@
-import { roundNumber } from '@/app/season';
+import { validateDuel } from '@/app/duel';
+import type { Entry } from '@/app/league';
+import { mergeArchive, roundNumber } from '@/app/season';
 import { validateOfficial } from '@/app/validation';
 import { getDb } from '@/db';
 import { entries } from '@/db/schema';
 import { eq, desc, and, gte, count } from 'drizzle-orm';
 import { admin } from '@/lib/organiser-auth';
-const official = ['race', 'qualifying', 'event', 'penalty', 'notice'];
-const singleton = ['race', 'qualifying', 'event'];
+const official = ['race', 'qualifying', 'event', 'penalty', 'notice', 'duel'];
+const singleton = ['race', 'qualifying', 'event', 'duel'];
 const json = (body: unknown, status = 200) =>
   Response.json(body, {
     status,
@@ -97,6 +99,23 @@ export async function POST(req: Request) {
       },
       400,
     );
+  }
+  if (kind === 'duel') {
+    try {
+      const round = roundNumber(title);
+      if (!/^Season 1 — Round ([1-9]|1[0-9]|2[0-4]): .+$/.test(title))
+        return json({ error: 'Invalid Duel round title.' }, 400);
+      const current = await getDb()
+        .select()
+        .from(entries)
+        .where(eq(entries.approved, 1));
+      validateDuel(JSON.parse(body), mergeArchive(current) as Entry[], round);
+    } catch (e) {
+      return json(
+        { error: e instanceof Error ? e.message : 'Invalid Duel.' },
+        400,
+      );
+    }
   }
   let guestName = '',
     guestId = '';

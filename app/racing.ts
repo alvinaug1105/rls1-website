@@ -1,3 +1,4 @@
+import { publishedDuel, duelBracket, duelSeeds, qualifyingFor } from './duel';
 import { canonical, roundNumber, schedule } from './season';
 import { fastestDuel, formatLap, sortQual, gap } from './result-utils';
 import type { Entry, Row } from './league';
@@ -138,6 +139,17 @@ export function raceDayClock(now: number) {
     hour: Number(part('hour')),
   };
 }
+export function raceWeekWindow(event: EventInfo) {
+  const start = Date.parse(`${event.date}T00:00:00+08:00`);
+  const weekday = new Date(`${event.date}T12:00:00Z`).getUTCDay();
+  // Schedule overrides retain their actual starting date; the window ends after Sunday.
+  const daysToSunday = (7 - weekday) % 7;
+  return {
+    start,
+    end: start + (daysToSunday + 1) * 86400000,
+    qualifyingAt: start + 21 * 3600000,
+  };
+}
 export function eventStatus(event: EventInfo, data: Entry[], now?: number) {
   if (
     data.some(
@@ -148,44 +160,42 @@ export function eventStatus(event: EventInfo, data: Entry[], now?: number) {
     )
   )
     return 'FINISHED';
-  // Explicit live racing must never be moved backwards by the qualifying clock.
   if (event.status === 'LIVE') return 'LIVE';
-  if (now !== undefined) {
-    const clock = raceDayClock(now);
-    if (event.date === clock.date && clock.hour >= 21) return 'QUALIFYING';
-  }
-  if (event.status && event.status !== 'UPCOMING') return event.status;
+  const duel = publishedDuel(data, event.round);
   if (
-    !event.status &&
-    data.some(
-      (e) =>
-        e.approved === 1 &&
-        e.kind === 'qualifying' &&
-        roundNumber(e.title) === event.round,
-    )
+    duel &&
+    duelBracket(duelSeeds(data, event.round), duel.winners).at(-1)?.winner
   )
-    return 'QUALIFYING';
-  if (now !== undefined && event.date === raceDayClock(now).date)
-    return 'RACE DAY';
+    return 'RACE';
+  if (qualifyingFor(data, event.round) && duelSeeds(data, event.round).length)
+    return 'DUEL';
+  if (event.status === 'QUALIFYING') return 'QUALIFYING';
+  const window = raceWeekWindow(event);
+  if (now !== undefined && now >= window.start && now < window.end)
+    return now >= window.qualifyingAt ? 'QUALIFYING' : 'RACE WEEK';
   return 'UPCOMING';
 }
-export function nextEvent(data: Entry[], now: number) {
-  const today = raceDayClock(now).date;
+export function getCurrentLeagueRound(data: Entry[], now: number) {
   const ordered = events(data).sort(
-    (a, b) =>
-      a.date.localeCompare(b.date) ||
-      (a.startAt || '').localeCompare(b.startAt || '') ||
-      a.round - b.round,
+    (a, b) => a.date.localeCompare(b.date) || a.round - b.round,
   );
-  // Keep today's event even after its start time or official completion.
-  // Advance only when the Hong Kong calendar date changes.
+  const current = ordered
+    .filter((e) => {
+      const w = raceWeekWindow(e);
+      return now >= w.start && now < w.end;
+    })
+    .at(-1);
   return (
-    ordered.find((e) => e.date === today) ||
+    current ||
     ordered.find(
-      (e) => e.date > today && eventStatus(e, data, now) !== 'FINISHED',
+      (e) =>
+        raceWeekWindow(e).start > now &&
+        eventStatus(e, data, now) !== 'FINISHED',
     )
   );
 }
+// Compatibility for existing callers; all selection uses one race-week policy.
+export const nextEvent = getCurrentLeagueRound;
 export function dateLabel(date: string) {
   return new Intl.DateTimeFormat('en-GB', {
     timeZone: 'UTC',

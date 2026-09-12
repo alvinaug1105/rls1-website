@@ -4,6 +4,7 @@ import { BrowserLink as Link } from '../browser-link';
 import { useClock } from '../race-ui';
 import { Flag, ShieldCheck, ArrowUpRight, LogOut, Menu } from 'lucide-react';
 import { useLeague } from '../league';
+import { DuelEditor } from '../duel-ui';
 import { ResultEditor } from '../result-editor';
 import { EventEditor } from '../event-editor';
 import { Championship } from '../championship';
@@ -22,6 +23,7 @@ const modules = [
   ['dashboard', 'Dashboard', 'Overview'],
   ['events', 'Events', 'Race management'],
   ['qualifying', 'Qualifying', 'Race management'],
+  ['duel', 'Duel', 'Race management'],
   ['results', 'Race results', 'Race management'],
   ['stewarding', 'Stewarding', 'Race management'],
   ['standings', 'Standings', 'Championship'],
@@ -278,7 +280,7 @@ export function AdminPortal({
                 <>
                   <div className="admin-stats">
                     <Link className="panel" href="/admin/events">
-                      <p className="eyebrow">NEXT EVENT</p>
+                      <p className="eyebrow">CURRENT / UPCOMING ROUND</p>
                       <h2>
                         {upcoming
                           ? `Round ${upcoming.round}`
@@ -335,7 +337,7 @@ export function AdminPortal({
                 <EventEditor
                   league={league}
                   fixedMode="event"
-                  initialRound={initialRound ?? upcoming?.round ?? 7}
+                  initialRound={initialRound ?? upcoming?.round ?? 24}
                 />
               )}
               {section === 'stewarding' && (
@@ -343,7 +345,7 @@ export function AdminPortal({
                   <EventEditor
                     league={league}
                     fixedMode="penalty"
-                    initialRound={initialRound ?? upcoming?.round ?? 7}
+                    initialRound={initialRound ?? upcoming?.round ?? 24}
                   />
                   <PublishingDesk league={league} mode="stewarding" />
                 </>
@@ -352,14 +354,20 @@ export function AdminPortal({
                 <ResultEditor
                   league={league}
                   sessionKind="qualifying"
-                  initialRound={initialRound}
+                  initialRound={initialRound ?? upcoming?.round ?? 24}
+                />
+              )}
+              {section === 'duel' && (
+                <DuelEditor
+                  league={league}
+                  initialRound={initialRound ?? upcoming?.round ?? 24}
                 />
               )}
               {section === 'results' && (
                 <ResultEditor
                   league={league}
                   sessionKind="race"
-                  initialRound={initialRound}
+                  initialRound={initialRound ?? upcoming?.round ?? 24}
                 />
               )}
               {section === 'standings' && (

@@ -1,5 +1,8 @@
 'use client';
 import { useState } from 'react';
+import { PngExport } from './png-export';
+import { drawResultGraphic, raceGraphic } from './result-png';
+import { DuelView } from './duel-ui';
 import { QualifyingCard } from './qualifying-card';
 import { fastestDuel, formatLap, sortQual } from './result-utils';
 import { schedule, roundTitle, canonical, roundNumber, roster } from './season';
@@ -45,6 +48,7 @@ export function SeasonResults({
   onRound: (r: number) => void;
 }) {
   const [view, setView] = useState('overview');
+  const now = useClock();
   const event = events(data)[round - 1],
     race = data.find(
       (e) => e.kind === 'race' && e.approved && roundNumber(e.title) === round,
@@ -112,6 +116,13 @@ export function SeasonResults({
               >
                 Download CSV
               </button>
+              <PngExport
+                label="Save Race Result PNG"
+                filename={`RLS1-S1-R${round}-race.png`}
+                draw={(canvas) =>
+                  drawResultGraphic(canvas, raceGraphic(round, rows))
+                }
+              />
               <CopyButton text={raceRecap(round, rows)} />
             </div>
           </>
@@ -169,7 +180,9 @@ export function SeasonResults({
           </p>
           <h2>{event.country.toUpperCase()}</h2>
           <p>{dateLabel(event.date)}</p>
-          <span className="badge verified">{eventStatus(event, data)}</span>
+          <span className="badge verified">
+            {eventStatus(event, data, now ?? undefined)}
+          </span>
         </div>
         <div className="round-number" aria-hidden="true">
           {String(round).padStart(2, '0')}
@@ -192,8 +205,9 @@ export function SeasonResults({
       <Tabs value={view} onValueChange={(v) => setView(String(v))}>
         <TabsList className="event-tabs">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="race">Race</TabsTrigger>
           <TabsTrigger value="qualifying">Qualifying</TabsTrigger>
+          <TabsTrigger value="duel">Duel</TabsTrigger>
+          <TabsTrigger value="race">Race</TabsTrigger>
           <TabsTrigger value="penalties">
             Penalties ({penalties.length})
           </TabsTrigger>
@@ -222,13 +236,17 @@ export function SeasonResults({
               Add to calendar
             </button>
           </section>
-          {racePanel}
           <QualifyingCard
             key={round}
             round={round}
             rows={grid}
             count={grid.length}
           />
+          <DuelView data={data} round={round} />
+          {racePanel}
+        </TabsContent>
+        <TabsContent value="duel">
+          <DuelView data={data} round={round} />
         </TabsContent>
         <TabsContent value="race">{racePanel}</TabsContent>
         <TabsContent value="qualifying">
@@ -289,7 +307,9 @@ export function CalendarView({
     all = events(data),
     next = now === null ? undefined : nextEvent(data, now),
     visible = all.filter(
-      (e) => filter === 'all' || eventStatus(e, data) !== 'FINISHED',
+      (e) =>
+        filter === 'all' ||
+        eventStatus(e, data, now ?? undefined) !== 'FINISHED',
     );
   return (
     <>
@@ -337,15 +357,8 @@ export function CalendarView({
             <span className="roundchip">R{e.round}</span>
             <div>
               <span className="eyebrow">
-                {eventStatus(e, data) === 'FINISHED'
-                  ? 'COMPLETED'
-                  : e.round === next?.round
-                    ? 'NEXT'
-                    : eventStatus(e, data) === 'QUALIFYING'
-                      ? 'QUALIFYING'
-                      : eventStatus(e, data) === 'LIVE'
-                        ? 'LIVE'
-                        : 'UPCOMING'}
+                {eventStatus(e, data, now ?? undefined)}
+                {e.round === next?.round ? ' · CURRENT' : ''}
               </span>
               <h3>
                 {e.flag} {e.country}
@@ -361,7 +374,7 @@ export function CalendarView({
                   : 'Time TBA'}
               </p>
               <button className="outline" onClick={() => onEvent(e.round)}>
-                {eventStatus(e, data) === 'FINISHED'
+                {eventStatus(e, data, now ?? undefined) === 'FINISHED'
                   ? 'View results'
                   : 'View event'}{' '}
                 →
