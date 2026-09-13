@@ -1,7 +1,5 @@
 /* eslint-disable nextjs/no-img-element -- The image is a generated canvas data URL; it cannot use server image optimization. */
 'use client';
-import { PngExport } from './png-export';
-import { drawResultGraphic, qualifyingGraphic } from './result-png';
 import {
   Table,
   TableHeader,
@@ -11,10 +9,7 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import { formatLap, gap, sortQual, type QualRow } from './result-utils';
-import { CopyButton } from './race-ui';
-import { qualifyingRecap } from './racing';
 export function QualifyingCard({
-  round,
   rows,
   partial = false,
   count = rows.length,
@@ -87,19 +82,7 @@ export function QualifyingCard({
               ))}
             </TableBody>
           </Table>
-          <div className="formactions">
-            <PngExport
-              label="Save Qualifying PNG"
-              filename={`RLS1-S1-R${round}-qualifying.png`}
-              draw={(canvas) =>
-                drawResultGraphic(
-                  canvas,
-                  qualifyingGraphic(round, grid, partial, count),
-                )
-              }
-            />
-            <CopyButton text={qualifyingRecap(round, grid)} />
-          </div>
+          
           {partial && (
             <p className="footnote">
               The full classification will appear after race control publishes

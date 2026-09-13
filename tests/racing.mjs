@@ -106,19 +106,6 @@ validation.validateOfficial(
     status: 'UPCOMING',
   }),
 );
-const q = season.qualifyingArchive[5];
-assert.match(racing.qualifyingRecap(6, JSON.parse(q.body)), /0:52.751/);
-assert.match(
-  racing.raceRecap(
-    5,
-    racing.classification(
-      season.archive.find(
-        (e) => e.kind === 'race' && season.roundNumber(e.title) === 5,
-      ),
-    ),
-  ),
-  /Fastest duel lap: Winter/,
-);
 assert.deepEqual(
   racing.calculateStandings([
     ...season.archive,
@@ -136,7 +123,7 @@ assert.deepEqual(
   'Steward notes cannot silently change points',
 );
 console.log(
-  'PASS: archive preservation, WDC/WCC, wins/podiums/gaps, progression, event selection/status, ICS dates/timezones, lap validation, duplicate/position validation, recaps and penalty isolation.',
+  'PASS: archive preservation, WDC/WCC, wins/podiums/gaps, progression, event selection/status, ICS dates/timezones, lap validation, duplicate/position validation, penalty isolation.',
 );
 
 // Race-day behavior always uses the schedule date in Hong Kong, independent
@@ -440,3 +427,26 @@ assert.deepEqual(
 console.log(
   'PASS: Wednesday–Sunday race week, Monday/Tuesday rollover, published stage precedence, top-eight bracket, byes, progression, invalid selections/laps, qualifying dependency and points isolation.',
 );
+
+const session = load('app/session.ts');
+const media = load('app/media.ts');
+const scheduledEvent = racing.events([]).find(e => e.round === 7);
+const startTime = racing.raceWeekWindow(scheduledEvent).qualifyingAt;
+for (const seconds of [86401, 3600, 900, 1]) {
+  assert.equal(session.sessionState(scheduledEvent, [], startTime - seconds * 1000).remaining, seconds);
+}
+for (const offset of [0, 1000, 60000]) {
+  const state = session.sessionState(scheduledEvent, [], startTime + offset);
+  assert.equal(state.remaining, null);
+  assert.equal(state.stage, 'QUALIFYING');
+}
+assert.match(session.sessionState(scheduledEvent, [], startTime).scheduled, /21:00 HKT/);
+assert.equal(media.mediaGraphics([], 7).every(g => !g.available), true);
+assert.equal(media.mediaGraphics(season.archive, 1).find(g => g.id === 'race').available, true);
+const completedEvent = racing.events(season.archive)[0];
+assert.equal(session.sessionState(completedEvent, season.archive, racing.raceWeekWindow(completedEvent).qualifyingAt).remaining, null);
+assert.equal(session.sessionState(completedEvent, season.archive, racing.raceWeekWindow(completedEvent).qualifyingAt).stage, 'FINISHED');
+for (const file of ['championship.tsx','duel-ui.tsx','qualifying-card.tsx','season-views.tsx']) {
+  assert.doesNotMatch(fs.readFileSync(path.join(root,'app',file),'utf8'), /PngExport|CopyButton|Recap/);
+}
+console.log('Session countdown thresholds and media availability passed.');

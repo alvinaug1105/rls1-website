@@ -1,6 +1,5 @@
 import { publishedDuel, duelBracket, duelSeeds, qualifyingFor } from './duel';
 import { canonical, roundNumber, schedule } from './season';
-import { fastestDuel, formatLap, sortQual, gap } from './result-utils';
 import type { Entry, Row } from './league';
 
 export const driverId = (name: string) => canonical(name).toLowerCase();
@@ -123,6 +122,7 @@ export function events(data: Entry[]): EventInfo[] {
   });
 }
 export const RACE_TIME_ZONE = 'Asia/Hong_Kong';
+export const SESSION_SCHEDULE = { qualifying: { hour: 21, minute: 0 }, duel: null, race: null } as const;
 const raceClock = new Intl.DateTimeFormat('en-CA', {
   timeZone: RACE_TIME_ZONE,
   year: 'numeric',
@@ -147,7 +147,7 @@ export function raceWeekWindow(event: EventInfo) {
   return {
     start,
     end: start + (daysToSunday + 1) * 86400000,
-    qualifyingAt: start + 21 * 3600000,
+    qualifyingAt: start + (SESSION_SCHEDULE.qualifying.hour * 60 + SESSION_SCHEDULE.qualifying.minute) * 60000,
   };
 }
 export function eventStatus(event: EventInfo, data: Entry[], now?: number) {
@@ -204,28 +204,6 @@ export function dateLabel(date: string) {
     month: 'short',
     year: 'numeric',
   }).format(new Date(date + 'T12:00:00Z'));
-}
-export function raceRecap(round: number, rows: Row[]) {
-  const best = fastestDuel(rows);
-  return `🏁 RLS1 — ROUND ${String(round).padStart(2, '0')} · ${schedule[round - 1].country}\n\nRACE RESULTS\n\n${rows.map((r, i) => `P${i + 1} ${r.driver} — ${r.team} — ${r.points} pts`).join('\n')}${best ? `\n\nFastest duel lap: ${best.driver} — ${formatLap(best.duelMs!)}` : ''}`;
-}
-export function qualifyingRecap(
-  round: number,
-  rows: import('./result-utils').QualRow[],
-) {
-  const sorted = sortQual(rows);
-  return `🏁 RLS1 — ROUND ${String(round).padStart(2, '0')} · ${schedule[round - 1].country}\n\nQUALIFYING RESULTS\n\n${sorted.map((r, i) => `P${i + 1} ${r.driver} — ${r.team || '—'} — ${r.ms ? formatLap(r.ms) : '—'}${i && r.ms && sorted[0].ms ? ` (${gap(r.ms, sorted[0].ms)})` : ''}`).join('\n')}`;
-}
-export function standingsRecap(data: Entry[], teams = false) {
-  return `🏆 RLS1 — ${teams ? 'TEAM' : 'DRIVER'} STANDINGS\n\n${calculateStandings(
-    data,
-    teams,
-  )
-    .map(
-      (r) =>
-        `P${r.position} ${r.name} — ${r.points} pts${r.gap ? ` (${r.gap} behind)` : ' — Leader'}`,
-    )
-    .join('\n')}`;
 }
 const escapeICS = (text: string) =>
   text

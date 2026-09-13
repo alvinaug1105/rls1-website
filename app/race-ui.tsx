@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Check, Copy, Flag } from 'lucide-react';
+import { Flag } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -20,57 +20,6 @@ export function EmptyState({
       <h3>{title}</h3>
       <div className="muted">{children}</div>
     </div>
-  );
-}
-export function CopyButton({
-  text,
-  label = 'Copy Discord recap',
-}: {
-  text: string;
-  label?: string;
-}) {
-  const [copied, setCopied] = useState(false),
-    [fallback, setFallback] = useState(false);
-  useEffect(() => {
-    queueMicrotask(() => setCopied(false));
-  }, [text]);
-  useEffect(() => {
-    if (!copied) return;
-    const id = setTimeout(() => setCopied(false), 2500);
-    return () => clearTimeout(id);
-  }, [copied]);
-  return (
-    <>
-      <button
-        className="outline"
-        onClick={async () => {
-          try {
-            await navigator.clipboard.writeText(text);
-            setCopied(true);
-          } catch {
-            setFallback(true);
-          }
-        }}
-      >
-        {copied ? <Check size={16} /> : <Copy size={16} />}
-        <span aria-live="polite">{copied ? 'Copied' : label}</span>
-      </button>
-      <Dialog open={fallback} onOpenChange={setFallback}>
-        <DialogContent>
-          <DialogTitle>Copy your recap</DialogTitle>
-          <DialogDescription>
-            Automatic copying is unavailable. Select and copy this text.
-          </DialogDescription>
-          <textarea
-            aria-label="Discord recap"
-            readOnly
-            rows={10}
-            value={text}
-            onFocus={(e) => e.target.select()}
-          />
-        </DialogContent>
-      </Dialog>
-    </>
   );
 }
 export function ScoringRules() {

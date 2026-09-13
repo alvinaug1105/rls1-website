@@ -553,3 +553,7 @@ button:disabled {
 .admin-login .eyebrow {
   color: var(--rls-gold);
 }
+
+.session-countdown { margin: 18px 0; padding: 16px; border-left: 3px solid var(--rls-gold); background: var(--rls-surface); }
+.session-digits { font-size: clamp(24px, 5vw, 40px); font-variant-numeric: tabular-nums; white-space: nowrap; letter-spacing: .02em; }
+.media-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,280px),1fr)); gap: 16px; margin-top: 24px; }

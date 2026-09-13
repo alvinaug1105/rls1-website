@@ -1,8 +1,6 @@
 /* eslint-disable jsx-a11y/no-noninteractive-tabindex, jsx-a11y/prefer-tag-over-role -- The labeled scroll region is keyboard-focusable; the SVG has an accessible title and a text data table. */
 'use client';
 import { useState } from 'react';
-import { PngExport } from './png-export';
-import { drawResultGraphic, standingsGraphic } from './result-png';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   Table,
@@ -16,9 +14,8 @@ import {
   calculateStandings,
   progression,
   raceEntries,
-  standingsRecap,
 } from './racing';
-import { CopyButton, ScoringRules, EmptyState } from './race-ui';
+import { ScoringRules, EmptyState } from './race-ui';
 import type { Entry } from './league';
 const colors = [
   '#ff766e',
@@ -166,23 +163,7 @@ export function Championship({ data }: { data: Entry[] }) {
                     round. Equal points are displayed alphabetically pending
                     official tie-breaks.
                   </p>
-                  <div className="formactions">
-                    <PngExport
-                      label={teams ? 'Save WCC PNG' : 'Save WDC PNG'}
-                      filename={`RLS1-S1-${teams ? 'WCC' : 'WDC'}-R${rounds.at(-1) ? rounds.at(-1)!.title.match(/Round (\d+)/)?.[1] : 0}.png`}
-                      draw={(canvas) =>
-                        drawResultGraphic(
-                          canvas,
-                          standingsGraphic(
-                            boards[teams ? 1 : 0],
-                            teams,
-                            rounds.length,
-                          ),
-                        )
-                      }
-                    />
-                    <CopyButton text={standingsRecap(data, teams)} />
-                  </div>
+                  
                 </>
               )}
             </section>

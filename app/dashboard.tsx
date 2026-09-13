@@ -1,4 +1,5 @@
 'use client';
+import { SessionCountdown } from './session-countdown';
 import { StatusBadge } from './status-badge';
 import {
   calculateStandings,
@@ -8,7 +9,6 @@ import {
   raceEntries,
   classification,
   raceWeekWindow,
-  RACE_TIME_ZONE,
 } from './racing';
 import { roundNumber, schedule } from './season';
 import { useClock, EmptyState } from './race-ui';
@@ -26,10 +26,6 @@ export function Dashboard({
     next = now === null ? undefined : nextEvent(data, now),
     leaders = calculateStandings(data).slice(0, 3),
     last = raceEntries(data).at(-1);
-  const seconds =
-    next?.startAt && now
-      ? Math.max(0, Math.floor((Date.parse(next.startAt) - now) / 1000))
-      : null;
   return (
     <>
       <div className="dashboard-grid">
@@ -59,38 +55,7 @@ export function Dashboard({
                 Wednesday–Sunday · Hong Kong league time
               </p>
               <p>{dateLabel(next.date)}</p>
-              {next.startAt ? (
-                <>
-                  <p className="muted">
-                    {new Intl.DateTimeFormat('en-GB', {
-                      timeZone: RACE_TIME_ZONE,
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    }).format(new Date(next.startAt))}{' '}
-                    · Hong Kong time
-                  </p>
-                  {seconds !== null && seconds > 0 && (
-                    <p
-                      className="countdown"
-                      aria-label={`${Math.floor(seconds / 86400)} days ${Math.floor((seconds % 86400) / 3600)} hours ${Math.floor((seconds % 3600) / 60)} minutes until start`}
-                    >
-                      {String(Math.floor(seconds / 86400)).padStart(2, '0')}D :{' '}
-                      {String(Math.floor((seconds % 86400) / 3600)).padStart(
-                        2,
-                        '0',
-                      )}
-                      H :{' '}
-                      {String(Math.floor((seconds % 3600) / 60)).padStart(
-                        2,
-                        '0',
-                      )}
-                      M
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p className="muted">Start time to be announced</p>
-              )}
+              <SessionCountdown event={next} data={data} />
               <button className="primary" onClick={() => onEvent(next.round)}>
                 View round →
               </button>

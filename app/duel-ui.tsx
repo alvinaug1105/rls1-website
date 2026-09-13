@@ -1,7 +1,5 @@
 'use client';
 import { useState } from 'react';
-import { PngExport } from './png-export';
-import { drawDuelGraphic } from './result-png';
 import type { Entry, League } from './league';
 import {
   duelSeeds,
@@ -57,13 +55,7 @@ export function DuelView({
   return (
     <section className="panel duel-panel">
       <h3>Duel</h3>
-      <PngExport
-        label="Save Duel PNG"
-        filename={`RLS1-S1-R${round}-duel${draft ? '-draft' : ''}.png`}
-        draw={(canvas) =>
-          drawDuelGraphic(canvas, round, seeds, record, !!draft)
-        }
-      />
+      
       <p className="muted">
         {stale
           ? 'Qualifying was updated. The organiser must review and republish this bracket.'

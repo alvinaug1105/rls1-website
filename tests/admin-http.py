@@ -13,7 +13,7 @@ def request(path, method='GET', body=None, origin=base, opener=client):
         with opener.open(r,timeout=20) as response: return response.status,response.read().decode(),response.headers
     except urllib.error.HTTPError as e:return e.code,e.read().decode(),e.headers
 anon=urllib.request.build_opener()
-for path in ['/admin','/admin/events','/admin/qualifying','/admin/results','/admin/stewarding','/admin/standings','/admin/drivers','/admin/submissions','/admin/publishing']:
+for path in ['/admin','/admin/events','/admin/qualifying','/admin/results','/admin/stewarding','/admin/standings','/admin/drivers','/admin/submissions','/admin/publishing','/admin/media']:
     status,body,h=request(path,opener=anon)
     assert status==200 and 'Organiser access only' in body and 'Logged in as Organiser' not in body,path
     assert key not in body

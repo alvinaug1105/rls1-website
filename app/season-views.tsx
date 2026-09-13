@@ -1,8 +1,7 @@
 'use client';
+import { SessionCountdown } from './session-countdown';
 import { StatusBadge } from './status-badge';
 import { useState } from 'react';
-import { PngExport } from './png-export';
-import { drawResultGraphic, raceGraphic } from './result-png';
 import { DuelView } from './duel-ui';
 import { QualifyingCard } from './qualifying-card';
 import { fastestDuel, formatLap, sortQual } from './result-utils';
@@ -17,10 +16,9 @@ import {
   dateLabel,
   calendarFile,
   downloadFile,
-  raceRecap,
   driverId,
 } from './racing';
-import { EmptyState, CopyButton, ScoringRules, useClock } from './race-ui';
+import { EmptyState, ScoringRules, useClock } from './race-ui';
 import {
   Select,
   SelectTrigger,
@@ -38,7 +36,6 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import { type Entry } from './league';
-const csv = (s: string) => '"' + s.replaceAll('"', '""') + '"';
 export function SeasonResults({
   data,
   round,
@@ -97,35 +94,7 @@ export function SeasonResults({
                 ))}
               </TableBody>
             </Table>
-            <div className="formactions">
-              <button
-                className="outline"
-                onClick={() =>
-                  downloadFile(
-                    `rls1-round-${round}.csv`,
-                    'Position,Driver,Team,Points\r\n' +
-                      rows
-                        .map((r, i) =>
-                          [i + 1, csv(r.driver), csv(r.team), r.points].join(
-                            ',',
-                          ),
-                        )
-                        .join('\r\n'),
-                    'text/csv;charset=utf-8',
-                  )
-                }
-              >
-                Download CSV
-              </button>
-              <PngExport
-                label="Save Race Result PNG"
-                filename={`RLS1-S1-R${round}-race.png`}
-                draw={(canvas) =>
-                  drawResultGraphic(canvas, raceGraphic(round, rows))
-                }
-              />
-              <CopyButton text={raceRecap(round, rows)} />
-            </div>
+
           </>
         ) : (
           <EmptyState title="Awaiting the chequered flag.">
@@ -182,6 +151,7 @@ export function SeasonResults({
           <h2>{event.country.toUpperCase()}</h2>
           <p>{dateLabel(event.date)}</p>
           <StatusBadge status={eventStatus(event, data, now ?? undefined)} />
+          {now !== null && nextEvent(data, now)?.round === round && <SessionCountdown event={event} data={data} />}
         </div>
         <div className="round-number" aria-hidden="true">
           {String(round).padStart(2, '0')}

@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { BrowserLink as Link } from '../browser-link';
+import { MediaCentre } from './media-centre';
+import { SessionCountdown } from '../session-countdown';
 import { useClock } from '../race-ui';
 import { Flag, ShieldCheck, ArrowUpRight, LogOut, Menu } from 'lucide-react';
 import { useLeague } from '../league';
@@ -28,6 +30,7 @@ const modules = [
   ['stewarding', 'Stewarding', 'Race management'],
   ['standings', 'Standings', 'Championship'],
   ['drivers', 'Drivers & teams', 'Championship'],
+  ['media', 'Media Centre', 'Content'],
   ['submissions', 'Guest submissions', 'Content'],
   ['publishing', 'Publishing desk', 'Publishing'],
 ];
@@ -257,7 +260,7 @@ export function AdminPortal({
             <p className="muted">
               {section === 'dashboard'
                 ? 'League control centre. Every update starts here.'
-                : 'Review your changes before publishing to the public site.'}
+                : section === 'media' ? 'Generate official graphics from published league results.' : 'Review your changes before publishing to the public site.'}
             </p>
           </div>
           {(error || league.error) && (
@@ -286,7 +289,7 @@ export function AdminPortal({
                           ? `Round ${upcoming.round}`
                           : 'Season complete'}
                       </h2>
-                      <p>{upcoming?.country || 'No upcoming event'}</p>
+                      <p>{upcoming?.country || 'No upcoming event'}</p>{upcoming && <SessionCountdown event={upcoming} data={league.data} />}
                       <span>Edit event →</span>
                     </Link>
                     <Link className="panel" href="/admin/standings">
@@ -333,6 +336,7 @@ export function AdminPortal({
                   </section>
                 </>
               )}
+              {section === 'media' && <MediaCentre data={league.data} initialRound={initialRound} />}
               {section === 'events' && (
                 <EventEditor
                   league={league}
