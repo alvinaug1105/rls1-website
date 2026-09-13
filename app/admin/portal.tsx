@@ -64,7 +64,7 @@ export function AdminLogin() {
       <section className="panel login-card">
         <ShieldCheck size={36} />
         <p className="eyebrow">LEAGUE OPERATIONS / SEASON 01</p>
-        <h1>Admin portal</h1>
+        <h1>League control centre</h1>
         <p className="muted">
           Organiser access only. Sign in to manage the league.
         </p>

@@ -47,6 +47,7 @@ export default function Home() {
     window.addEventListener('hashchange', apply);
     return () => window.removeEventListener('hashchange', apply);
   }, []);
+  const [navOpen, setNavOpen] = useState(false);
   const openEvent = (r: number) => {
     setRound(r);
     setTab('results');
@@ -93,8 +94,26 @@ export default function Home() {
             </p>
           )}
         </div>
-        <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
-          <TabsList className="mainnav" variant="line">
+        <Tabs
+          value={tab}
+          onValueChange={(v) => {
+            setTab(String(v));
+            setNavOpen(false);
+          }}
+        >
+          <button
+            className="mobile-navigation outline"
+            aria-expanded={navOpen}
+            aria-controls="league-navigation"
+            onClick={() => setNavOpen(!navOpen)}
+          >
+            ☰ {views.find((v) => v.id === tab)?.label} · Menu
+          </button>
+          <TabsList
+            id="league-navigation"
+            className={`mainnav ${navOpen ? 'nav-open' : ''}`}
+            variant="line"
+          >
             {views.map(({ id, label, Icon }) => (
               <TabsTrigger key={id} value={id}>
                 <Icon size={17} />

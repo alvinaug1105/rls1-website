@@ -22,17 +22,105 @@ function load(file) {
   );
   return exports;
 }
-const png=load('app/result-png.ts');
-const calls=[];
-const ctx={font:'24px Arial',measureText(s){const size=Number(this.font.match(/(\d+)px/)[1]);return {width:Array.from(s).length*size*.65};},fillText(s,x,y){calls.push({s,x,y,width:this.measureText(s).width});},fillRect(){}};
-const canvas={width:0,height:0,getContext(){return ctx;}};
-const rows=Array.from({length:8},(_,i)=>({driver:`Driver ${i+1} `+'VeryLongUnbrokenName'.repeat(5),team:'A long racing team name '.repeat(8),ms:60000+i*1000,attempts:3,points:25-i,duelMs:62000+i*1000}));
-function bounds(){for(const t of calls){assert(t.x+t.width<=canvas.width,`Right clipping: ${t.s}`);assert(t.y+24<canvas.height,`Bottom clipping: ${t.s}`);}calls.length=0;}
-const qual=png.qualifyingGraphic(6,rows);assert.equal(qual.rows.length,8);assert.equal(qual.rows[1].cells[4],'+1.000');assert.equal(qual.rows[0].cells[2],'3/3');
-png.drawResultGraphic(canvas,qual);bounds();
-const race=png.raceGraphic(5,rows);assert.equal(race.rows[0].cells[3],'25');assert(race.footer[0].includes(rows[0].driver));png.drawResultGraphic(canvas,race);bounds();
-const record={round:6,qualifyingBody:'',winners:{QF1:rows[0].driver,QF2:rows[3].driver,QF3:rows[1].driver,QF4:rows[2].driver,SF1:rows[0].driver,SF2:rows[1].driver,FINAL:rows[0].driver},laps:{[rows[0].driver]:62000}};
-png.drawDuelGraphic(canvas,6,rows,record);assert(calls.some(t=>t.s.includes('QUARTER-FINALS')));bounds();
-for(const width of [320,375,1440]){globalThis.innerWidth=width;png.drawResultGraphic(canvas,qual);assert.equal(canvas.width,1200);bounds();png.drawDuelGraphic(canvas,6,rows,record);assert.equal(canvas.width,1500);bounds();}
-ctx.font='24px Arial';assert.equal(png.wrapText(ctx,rows[0].driver,100).join(''),rows[0].driver);
-console.log('PASS: qualifying/race data, full Duel bracket, long names without truncation, canvas bounds and viewport-independent export dimensions.');
+const png = load('app/result-png.ts');
+const calls = [];
+const ctx = {
+  font: '24px Arial',
+  measureText(s) {
+    const size = Number(this.font.match(/(\d+)px/)[1]);
+    return { width: Array.from(s).length * size * 0.65 };
+  },
+  fillText(s, x, y) {
+    calls.push({ s, x, y, width: this.measureText(s).width });
+  },
+  fillRect() {},
+};
+const canvas = {
+  width: 0,
+  height: 0,
+  getContext() {
+    return ctx;
+  },
+};
+const rows = Array.from({ length: 8 }, (_, i) => ({
+  driver: `Driver ${i + 1} ` + 'VeryLongUnbrokenName'.repeat(5),
+  team: 'A long racing team name '.repeat(8),
+  ms: 60000 + i * 1000,
+  attempts: 3,
+  points: 25 - i,
+  duelMs: 62000 + i * 1000,
+}));
+function bounds() {
+  for (const t of calls) {
+    assert(t.x + t.width <= canvas.width, `Right clipping: ${t.s}`);
+    assert(t.y + 24 < canvas.height, `Bottom clipping: ${t.s}`);
+  }
+  calls.length = 0;
+}
+const qual = png.qualifyingGraphic(6, rows);
+assert.equal(qual.rows.length, 8);
+assert.equal(qual.rows[1].cells[4], '+1.000');
+assert.equal(qual.rows[0].cells[2], '3/3');
+png.drawResultGraphic(canvas, qual);
+bounds();
+const race = png.raceGraphic(5, rows);
+assert.equal(race.rows[0].cells[3], '25');
+assert(race.footer[0].includes(rows[0].driver));
+png.drawResultGraphic(canvas, race);
+bounds();
+const record = {
+  round: 6,
+  qualifyingBody: '',
+  winners: {
+    QF1: rows[0].driver,
+    QF2: rows[3].driver,
+    QF3: rows[1].driver,
+    QF4: rows[2].driver,
+    SF1: rows[0].driver,
+    SF2: rows[1].driver,
+    FINAL: rows[0].driver,
+  },
+  laps: { [rows[0].driver]: 62000 },
+};
+png.drawDuelGraphic(canvas, 6, rows, record);
+assert(calls.some((t) => t.s.includes('QUARTER-FINALS')));
+bounds();
+for (const width of [320, 375, 1440]) {
+  globalThis.innerWidth = width;
+  png.drawResultGraphic(canvas, qual);
+  assert.equal(canvas.width, 1200);
+  bounds();
+  png.drawDuelGraphic(canvas, 6, rows, record);
+  assert.equal(canvas.width, 1500);
+  bounds();
+}
+ctx.font = '24px Arial';
+assert.equal(png.wrapText(ctx, rows[0].driver, 100).join(''), rows[0].driver);
+console.log(
+  'PASS: qualifying/race data, full Duel bracket, long names without truncation, canvas bounds and viewport-independent export dimensions.',
+);
+
+for (const teams of [false, true]) {
+  const standings = rows.map((r, i) => ({
+    name: r.driver,
+    team: r.team,
+    points: r.points,
+    position: i + 1,
+    gap: i * 5,
+    wins: 1,
+    podiums: 2,
+    starts: 5,
+    change: 0,
+  }));
+  const g = png.standingsGraphic(standings, teams, 5);
+  assert.equal(
+    g.rows[0].cells[1],
+    teams ? rows[0].driver : rows[0].driver + '\n' + rows[0].team,
+  );
+  assert(g.subtitle.includes('5 PUBLISHED'));
+  png.drawResultGraphic(canvas, g);
+  bounds();
+}
+console.log(
+  'PASS: WDC and WCC images preserve supplied standings, full names and points.',
+);

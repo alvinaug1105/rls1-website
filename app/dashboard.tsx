@@ -1,4 +1,5 @@
 'use client';
+import { StatusBadge } from './status-badge';
 import {
   calculateStandings,
   nextEvent,
@@ -51,11 +52,12 @@ export function Dashboard({
                 <span className="roundchip">
                   ROUND {String(next.round).padStart(2, '0')}
                 </span>
-                <span className="badge verified">
-                  {eventStatus(next, data, now)}
-                </span>
+                <StatusBadge status={eventStatus(next, data, now)} />
               </div>
               <h2>{next.country}</h2>
+              <p className="race-week-caption">
+                Wednesday–Sunday · Hong Kong league time
+              </p>
               <p>{dateLabel(next.date)}</p>
               {next.startAt ? (
                 <>

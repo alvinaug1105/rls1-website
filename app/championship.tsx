@@ -1,6 +1,8 @@
 /* eslint-disable jsx-a11y/no-noninteractive-tabindex, jsx-a11y/prefer-tag-over-role -- The labeled scroll region is keyboard-focusable; the SVG has an accessible title and a text data table. */
 'use client';
 import { useState } from 'react';
+import { PngExport } from './png-export';
+import { drawResultGraphic, standingsGraphic } from './result-png';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   Table,
@@ -30,6 +32,7 @@ const colors = [
 ];
 export function Championship({ data }: { data: Entry[] }) {
   const rounds = raceEntries(data);
+  const boards = [calculateStandings(data), calculateStandings(data, true)];
   return (
     <>
       <div className="sectionhead viewheading">
@@ -56,6 +59,32 @@ export function Championship({ data }: { data: Entry[] }) {
                 </EmptyState>
               ) : (
                 <>
+                  <div className="championship-podium">
+                    {boards[teams ? 1 : 0].slice(0, 3).map((r) => (
+                      <article
+                        key={r.name}
+                        className={`podium-card podium-${r.position}`}
+                      >
+                        <span className="eyebrow">
+                          P{r.position} ·{' '}
+                          {r.position === 1
+                            ? 'CHAMPIONSHIP LEADER'
+                            : 'TITLE CONTENDER'}
+                        </span>
+                        <h3>{r.name}</h3>
+                        {!teams && <p className="muted">{r.team}</p>}
+                        <div className="podium-points">
+                          {r.points}
+                          <span>PTS</span>
+                        </div>
+                        <p className="muted">
+                          {r.gap
+                            ? `${r.gap} points behind`
+                            : 'Leading the championship'}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
                   <div
                     className="table-scroll"
                     role="region"
@@ -78,7 +107,7 @@ export function Championship({ data }: { data: Entry[] }) {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {calculateStandings(data, teams).map((r) => (
+                        {boards[teams ? 1 : 0].map((r) => (
                           <TableRow key={r.name}>
                             <TableCell
                               className={'position p' + (r.position - 1)}
@@ -137,7 +166,23 @@ export function Championship({ data }: { data: Entry[] }) {
                     round. Equal points are displayed alphabetically pending
                     official tie-breaks.
                   </p>
-                  <CopyButton text={standingsRecap(data, teams)} />
+                  <div className="formactions">
+                    <PngExport
+                      label={teams ? 'Save WCC PNG' : 'Save WDC PNG'}
+                      filename={`RLS1-S1-${teams ? 'WCC' : 'WDC'}-R${rounds.at(-1) ? rounds.at(-1)!.title.match(/Round (\d+)/)?.[1] : 0}.png`}
+                      draw={(canvas) =>
+                        drawResultGraphic(
+                          canvas,
+                          standingsGraphic(
+                            boards[teams ? 1 : 0],
+                            teams,
+                            rounds.length,
+                          ),
+                        )
+                      }
+                    />
+                    <CopyButton text={standingsRecap(data, teams)} />
+                  </div>
                 </>
               )}
             </section>

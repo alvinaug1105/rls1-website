@@ -86,53 +86,60 @@ export function DuelView({
         ).map(([title, group]) => (
           <div className="duel-column" key={String(title)}>
             <h4>{String(title)}</h4>
-            {(group as typeof matches).map((m) => (
-              <article className="duel-match" key={m.id}>
-                <p className="eyebrow">
-                  {m.id}
-                  {m.bye ? ' · BYE' : ''}
-                </p>
-                {m.players.map((p) => (
-                  <div
-                    className={
-                      m.winner?.driver === p.driver ? 'duel-winner' : ''
-                    }
-                    key={p.driver}
-                  >
-                    <strong>
-                      P{seeds.findIndex((s) => s.driver === p.driver) + 1} ·{' '}
-                      {p.driver}
-                    </strong>
-                    <small>
-                      {p.team}
-                      {record?.laps[p.driver]
-                        ? ` · ${formatLap(record.laps[p.driver])}`
-                        : ''}
-                    </small>
-                  </div>
-                ))}
-                {!m.ready && <p className="muted">Awaiting previous match</p>}
-                {m.ready && !m.players.length && (
-                  <p className="muted">Empty bracket slot</p>
-                )}
-                {onWinner && m.ready && m.players.length === 2 && (
-                  <label>
-                    Winner
-                    <select
-                      aria-label={`${m.id} winner`}
-                      value={record?.winners[m.id] || ''}
-                      onChange={(e) => onWinner(m.id, e.target.value)}
+            <div className="duel-matches">
+              {(group as typeof matches).map((m) => (
+                <article className="duel-match" key={m.id}>
+                  <p className="eyebrow">
+                    {m.id}
+                    {m.bye ? ' · BYE' : ''}
+                  </p>
+                  {m.players.map((p) => (
+                    <div
+                      className={
+                        m.winner?.driver === p.driver
+                          ? 'duel-winner'
+                          : m.winner
+                            ? 'duel-eliminated'
+                            : ''
+                      }
+                      key={p.driver}
                     >
-                      <option value="">Not decided</option>
-                      {m.players.map((p) => (
-                        <option key={p.driver}>{p.driver}</option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-                {!onWinner && m.winner && <p>Advances: {m.winner.driver}</p>}
-              </article>
-            ))}
+                      <strong>
+                        P{seeds.findIndex((s) => s.driver === p.driver) + 1} ·{' '}
+                        {p.driver}
+                        {m.winner?.driver === p.driver ? ' ✓' : ''}
+                      </strong>
+                      <small>
+                        {p.team}
+                        {record?.laps[p.driver]
+                          ? ` · ${formatLap(record.laps[p.driver])}`
+                          : ''}
+                      </small>
+                    </div>
+                  ))}
+                  {!m.ready && <p className="muted">Awaiting previous match</p>}
+                  {m.ready && !m.players.length && (
+                    <p className="muted">Empty bracket slot</p>
+                  )}
+                  {onWinner && m.ready && m.players.length === 2 && (
+                    <label>
+                      Winner
+                      <select
+                        aria-label={`${m.id} winner`}
+                        value={record?.winners[m.id] || ''}
+                        onChange={(e) => onWinner(m.id, e.target.value)}
+                      >
+                        <option value="">Not decided</option>
+                        {m.players.map((p) => (
+                          <option key={p.driver}>{p.driver}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  {!onWinner && m.winner && <p>Advances: {m.winner.driver}</p>}
+                </article>
+              ))}
+            </div>
           </div>
         ))}
       </div>
@@ -140,6 +147,7 @@ export function DuelView({
         <div className="duel-champion">
           <p className="eyebrow">DUEL WINNER</p>
           <h3>{champion.driver}</h3>
+          <p>{roundTitle(round)}</p>
         </div>
       )}
       {fastest && (

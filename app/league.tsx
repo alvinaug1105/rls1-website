@@ -384,6 +384,7 @@ export function Control({ league }: { league: League }) {
           {notices.length ? (
             notices.map((n) => (
               <article key={n.id} className="notice">
+                <p className="eyebrow">OFFICIAL · RACE CONTROL</p>
                 <h3>{n.title}</h3>
                 <p className="storybody">{n.body}</p>
               </article>

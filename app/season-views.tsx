@@ -1,4 +1,5 @@
 'use client';
+import { StatusBadge } from './status-badge';
 import { useState } from 'react';
 import { PngExport } from './png-export';
 import { drawResultGraphic, raceGraphic } from './result-png';
@@ -180,9 +181,7 @@ export function SeasonResults({
           </p>
           <h2>{event.country.toUpperCase()}</h2>
           <p>{dateLabel(event.date)}</p>
-          <span className="badge verified">
-            {eventStatus(event, data, now ?? undefined)}
-          </span>
+          <StatusBadge status={eventStatus(event, data, now ?? undefined)} />
         </div>
         <div className="round-number" aria-hidden="true">
           {String(round).padStart(2, '0')}
@@ -356,10 +355,10 @@ export function CalendarView({
           >
             <span className="roundchip">R{e.round}</span>
             <div>
-              <span className="eyebrow">
-                {eventStatus(e, data, now ?? undefined)}
-                {e.round === next?.round ? ' · CURRENT' : ''}
-              </span>
+              <StatusBadge status={eventStatus(e, data, now ?? undefined)} />
+              {e.round === next?.round && (
+                <p className="eyebrow">SELECTED LEAGUE ROUND</p>
+              )}
               <h3>
                 {e.flag} {e.country}
               </h3>

@@ -1,3 +1,4 @@
+import type { Standing } from './racing';
 import {
   formatLap,
   gap,
@@ -128,13 +129,15 @@ function base(
   const c = context(canvas);
   c.fillStyle = '#0b101b';
   c.fillRect(0, 0, width, height);
-  c.fillStyle = '#ff443d';
+  c.fillStyle = '#e6c66b';
   c.fillRect(0, 0, width, 12);
   text(c, 'RLS1 eSPORTS / SEASON 01', 40, 42, width - 80, 22, '#b5c2d6', true);
   text(c, title, 40, 90, width - 80, 42, '#ffffff', true);
   text(
     c,
-    `ROUND ${String(round).padStart(2, '0')} · ${schedule.find((e) => e.round === round)?.country.toUpperCase() || ''}`,
+    round
+      ? `ROUND ${String(round).padStart(2, '0')} · ${schedule.find((e) => e.round === round)?.country.toUpperCase() || ''}`
+      : 'SEASON 01 · THE TITLE FIGHT',
     40,
     155,
     width - 80,
@@ -173,7 +176,7 @@ export function drawResultGraphic(canvas: HTMLCanvasElement, g: Graphic) {
   });
   let y = 310;
   g.rows.forEach((r, i) => {
-    c.fillStyle = r.accent ? '#282039' : i % 2 ? '#101826' : '#151f2e';
+    c.fillStyle = r.accent ? '#292618' : i % 2 ? '#101826' : '#151f2e';
     c.fillRect(30, y, 1140, heights[i] - 4);
     x = 40;
     r.cells.forEach((cell, n) => {
@@ -242,6 +245,24 @@ export function drawDuelGraphic(
     '#b5c2d6',
   );
   const groups = [[0, 1, 2, 3], [4, 5], [6]];
+  // Dedicated export coordinates connect each pair to the next stage.
+  c.fillStyle = '#59616f';
+  for (const [col, count] of [
+    [0, 4],
+    [1, 2],
+  ]) {
+    const edge = 40 + col * 480 + 460,
+      step = (4 / count) * (cardHeight + 20);
+    for (let pair = 0; pair < count / 2; pair++) {
+      const top = 315 + (pair * 2 + 0.5) * step,
+        bottom = top + step;
+      c.fillRect(edge, top, 10, 2);
+      c.fillRect(edge, bottom, 10, 2);
+      c.fillRect(edge + 9, top, 2, bottom - top);
+      c.fillRect(edge + 10, (top + bottom) / 2, 10, 2);
+    }
+  }
+
   groups.forEach((ids, col) => {
     const x = 40 + col * 480;
     text(
@@ -274,4 +295,35 @@ export function drawDuelGraphic(
     '#8ea0b8',
   );
   return canvas;
+}
+
+export function standingsGraphic(
+  rows: Standing[],
+  teams: boolean,
+  count: number,
+): Graphic {
+  return {
+    round: 0,
+    title: teams ? 'CONSTRUCTORS CHAMPIONSHIP' : 'DRIVERS CHAMPIONSHIP',
+    subtitle: `SEASON 01 · AFTER ${count} PUBLISHED ROUNDS`,
+    headers: [
+      'POS',
+      teams ? 'TEAM' : 'DRIVER / TEAM',
+      'POINTS',
+      'GAP',
+      'WINS / PODIUMS',
+    ],
+    widths: [80, 500, 150, 150, 220],
+    rows: rows.map((r) => ({
+      accent: r.position === 1,
+      cells: [
+        String(r.position),
+        teams ? r.name : `${r.name}\n${r.team}`,
+        String(r.points),
+        r.gap ? `−${r.gap}` : 'Leader',
+        `${r.wins} / ${r.podiums}`,
+      ],
+    })),
+    footer: ['Official RLS1 standings · Published race classifications'],
+  };
 }
