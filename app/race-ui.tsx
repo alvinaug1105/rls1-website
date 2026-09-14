@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Flag } from 'lucide-react';
 import {
   Dialog,
@@ -50,12 +50,4 @@ export function ScoringRules() {
     </>
   );
 }
-export function useClock() {
-  const [now, setNow] = useState<number | null>(null);
-  useEffect(() => {
-    queueMicrotask(() => setNow(Date.now()));
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  return now;
-}
+export { useLeagueClock as useClock } from './league-clock';

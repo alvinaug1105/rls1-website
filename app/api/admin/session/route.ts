@@ -1,3 +1,4 @@
+import { limitedText, BodyLimitError } from '@/lib/request-body';
 import { authenticated, organiserSecret } from '@/lib/organiser-auth';
 import {
   mintSession,
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
   if (req.headers.get('origin') !== new URL(req.url).origin)
     return response({ error: 'Invalid origin.' }, 403);
   try {
-    const raw = await req.text();
+    const raw = await limitedText(req, 5000);
     if (raw.length > 5000)
       return response({ error: 'Invalid organiser key.' }, 400);
     const data = JSON.parse(raw);
@@ -47,8 +48,8 @@ export async function POST(req: Request) {
       200,
       cookie(req, await mintSession(secret), SESSION_SECONDS),
     );
-  } catch {
-    return response({ error: 'Unable to sign in. Please try again.' }, 400);
+  } catch (e) {
+    return response({ error: 'Unable to sign in. Please try again.' }, e instanceof BodyLimitError ? 413 : 400);
   }
 }
 export async function DELETE(req: Request) {

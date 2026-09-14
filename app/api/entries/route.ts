@@ -1,3 +1,4 @@
+import { limitedText, BodyLimitError } from '@/lib/request-body';
 import { validateDuel } from '@/app/duel';
 import type { Entry } from '@/app/league';
 import { mergeArchive, roundNumber } from '@/app/season';
@@ -20,7 +21,7 @@ const json = (body: unknown, status = 200) =>
 export async function GET(req: Request) {
   try {
     const isAdmin =
-      new URL(req.url).searchParams.get('public') !== '1' && (await admin(req));
+      new URL(req.url).searchParams.get('admin') === '1' && (await admin(req));
     if (new URL(req.url).searchParams.get('admin') === '1' && !isAdmin)
       return json({ error: 'Your session has expired. Sign in again.' }, 401);
     const data = await getDb()
@@ -51,11 +52,11 @@ export async function POST(req: Request) {
     new URL(req.url).searchParams.get('public') !== '1' && (await admin(req));
   let data;
   try {
-    const raw = await req.text();
+    const raw = await limitedText(req, 50000);
     if (raw.length > 50000) return json({ error: 'Post is too long.' }, 413);
     data = JSON.parse(raw);
-  } catch {
-    return json({ error: 'Invalid submission.' }, 400);
+  } catch (e) {
+    return json({ error: e instanceof BodyLimitError ? 'Post is too long.' : 'Invalid submission.' }, e instanceof BodyLimitError ? 413 : 400);
   }
   if (!data || typeof data !== 'object' || Array.isArray(data))
     return json({ error: 'Invalid submission.' }, 400);
@@ -110,11 +111,8 @@ export async function POST(req: Request) {
         .from(entries)
         .where(eq(entries.approved, 1));
       validateDuel(JSON.parse(body), mergeArchive(current) as Entry[], round);
-    } catch (e) {
-      return json(
-        { error: e instanceof Error ? e.message : 'Invalid Duel.' },
-        400,
-      );
+    } catch {
+      return json({ error: 'Unable to validate Duel. Check the published qualifying and bracket, then retry.' }, 400);
     }
   }
   let guestName = '',
@@ -242,9 +240,9 @@ export async function PATCH(req: Request) {
     return json({ error: 'Race control access required.' }, 403);
   let data: { id?: unknown; action?: unknown } | null;
   try {
-    data = (await req.json()) as typeof data;
-  } catch {
-    return json({ error: 'Invalid request.' }, 400);
+    data = (JSON.parse(await limitedText(req, 4096))) as typeof data;
+  } catch (e) {
+    return json({ error: 'Invalid request.' }, e instanceof BodyLimitError ? 413 : 400);
   }
   if (
     !data ||

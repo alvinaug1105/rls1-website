@@ -45,3 +45,5 @@ assert.notEqual(token, await mod.mintSession(secret, now));
 console.log(
   'PASS: signed sessions, expiry boundary, tamper rejection, key rotation, malformed tokens and credential comparisons.',
 );
+assert.equal(await mod.verifySession(token, secret, now - 1000), false);
+assert.equal(await mod.verifySession(token, secret, now + 1000), true, 'Copied bearer session is valid until expiry/key rotation; logout clears only the browser cookie');

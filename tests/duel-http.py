@@ -1,8 +1,10 @@
+import os
 import json, pathlib, urllib.request, urllib.error, http.cookiejar, argparse
 parser=argparse.ArgumentParser(description='Local-only admin route and session integration checks. Creates and removes one disposable story.')
 parser.add_argument('--key-file', required=True, help='Private local key file; never commit this file.')
 args=parser.parse_args()
-base='http://localhost:3000'
+base=os.environ.get('RLS_TEST_BASE','http://localhost:3000')
+assert base in ['http://localhost:3000','http://localhost:3001']
 raw=pathlib.Path(args.key_file).read_text()
 key=raw.split('private key:\n\n')[1].split('\n')[0] if 'private key:\n\n' in raw else raw.strip()
 jar=http.cookiejar.CookieJar(); client=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
