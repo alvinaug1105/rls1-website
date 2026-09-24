@@ -1,12 +1,17 @@
 # RLS1 eSports — League website
 
-Results, qualifying, WDC/WCC standings, a weekly season calendar, driver profiles, videos and moderated driver stories.
+Race-week dashboard, Qualifying, the top-eight Duel, race results, WDC/WCC standings, calendar, driver profiles, race-control noticeboard and moderated community posts — plus the organiser portal at `/admin`.
 
-## GitHub upload
+## Public routes
 
-Extract the ZIP first. Upload the contents of this folder, not the ZIP itself and not an extra enclosing folder. The repository root must contain package.json, package-lock.json, app/, components/, db/, drizzle/, public/ and configuration files.
+| Route | Content |
+|---|---|
+| `/` | Current race week, stage timeline, countdown, championship battle, latest result |
+| `/rounds/1` … `/rounds/24` | Round hub (Overview · Qualifying · Duel · Race · Stewarding); sections deep-link with `#qualifying`, `#duel`, `#race`, `#stewarding` |
+| `/results` | The current round |
+| `/championship`, `/calendar`, `/drivers`, `/noticeboard`, `/videos`, `/paddock` | Season views |
 
-Include hidden files/folders: .gitignore, .openai/, .oxfmtrc.json and .oxlintrc.json. On macOS Finder, press Command + Shift + . to reveal them.
+Old `/#round-N` links still work and are rewritten to `/rounds/N`.
 
 ## Local development
 
@@ -17,19 +22,34 @@ npm ci
 npm run dev
 ```
 
-The database needs the schema in drizzle/ applied to the local D1 binding. Set LEAGUE_ADMIN_KEY in a local .dev.vars file to enable organiser publishing. Never commit that file or your key.
+Apply the schema in `drizzle/` to the local D1 binding. Set `LEAGUE_ADMIN_KEY` in a local `.dev.vars` file to enable organiser access. `.dev.vars`, `.wrangler/` and `dist/` are git-ignored; never commit keys.
 
-## Cloudflare deployment status
+## Checks
 
-This is the current website source, ready to store in GitHub. It is not yet a standalone Cloudflare deployment package.
+```sh
+npx tsc --noEmit
+npm run lint
+node tests/racing.mjs        # archive fixture, WDC/WCC regression, race week, Duel, stages, stats
+node tests/admin-session.mjs
+node tests/result-png.mjs
+node tests/clock.mjs
+npm run build
+```
 
-It currently uses the Sites/Vinext setup. Before deploying directly to your Cloudflare account:
+Local-only integration tests (they refuse non-localhost targets and clean up their fixtures). Run against a dev server with a disposable local database, never production:
 
-- Configure your own Worker and D1 database and apply the included database migration.
-- Configure the production LEAGUE_ADMIN_KEY as a secret.
-- Adapt the Sites build integration to direct Cloudflare deployment.
-- Replace the Sites-specific ChatGPT sign-in with an authentication flow supported by your deployment. Do not trust incoming identity headers directly on a public Worker.
+```sh
+python3 tests/admin-http.py    --key-file <private local key file>
+python3 tests/duel-http.py     --key-file <private local key file>
+python3 tests/security-http.py --key-file <private local key file>
+python3 tests/hardening-http.py --key-file <private local key file>
+node tests/e2e-smoke.mjs       --key-file <private local key file>   # needs an existing Playwright install
+```
 
-Do not enable community submissions on a public deployment until authentication is adapted and verified.
+`RLS_TEST_BASE` selects `http://localhost:3000`–`3003`.
 
-Historical rounds 1–5 are included in app/season.ts. New posts and result edits live in D1; this export deliberately excludes the local database and all secrets.
+## Deployment notes
+
+The site builds with vinext for Cloudflare Workers with a D1 binding named `DB`. Configure `LEAGUE_ADMIN_KEY` as a Worker **secret**. Keep `/admin*` and `/api/*` uncached at the edge. See `RLS1-QUALITY-PASS-REPORT.md` for the current engineering status and remaining operational recommendations.
+
+Historical rounds 1–5 (race) and 1–6 (qualifying) are included in `app/season.ts`; newer results live in D1.

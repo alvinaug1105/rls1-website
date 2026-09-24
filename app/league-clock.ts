@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { createLeagueClock } from '../lib/league-clock';
 const clock = createLeagueClock({
   wall: () => Date.now(), mono: () => performance.now(),
@@ -13,8 +13,17 @@ const clock = createLeagueClock({
 });
 const subscribe = (fn: () => void) => clock.subscribe(fn);
 const serverSnapshot = () => null;
-export function useLeagueClock() {
-  const now = useSyncExternalStore(subscribe, clock.snapshot, serverSnapshot);
+// All callers share one sync and one tick interval. `resolution` quantises the
+// returned time so a component re-renders only when that unit changes: the
+// countdown uses seconds; race-week/stage selection only needs minutes, because
+// every league boundary (Wednesday 00:00, 21:00 qualifying, Monday rollover)
+// falls exactly on a minute.
+export function useLeagueClock(resolution = 1000) {
+  const snapshot = useCallback(() => {
+    const now = clock.snapshot();
+    return now === null ? null : now - (now % resolution);
+  }, [resolution]);
+  const now = useSyncExternalStore(subscribe, snapshot, serverSnapshot);
   useEffect(() => {
     const resume = () => { if (document.visibilityState === 'visible') clock.resume(); };
     document.addEventListener('visibilitychange', resume);
@@ -23,3 +32,4 @@ export function useLeagueClock() {
   }, []);
   return now;
 }
+export const MINUTE = 60000;

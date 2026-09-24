@@ -1,4 +1,8 @@
 // Supplied league announcements and Season 1 calendar. Missing qualifying rows are not inferred.
+// Display labels for the active season. Stored titles keep the historical
+// "Season 1 — Round N: Country" format that existing records and the Duel API
+// validate against, so changing SEASON alone does not migrate data.
+export const SEASON = { number: 1, label: 'Season 01', years: '2026–27' } as const;
 export const canonical = (name: string) =>
   ({
     winter_my_wife: 'Winter',

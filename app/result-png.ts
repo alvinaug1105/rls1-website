@@ -8,7 +8,7 @@ import {
 } from './result-utils';
 import { duelBracket, duelFastest, type DuelRecord } from './duel';
 import type { Row } from './league';
-import { schedule } from './season';
+import { schedule, SEASON } from './season';
 export type GraphicRow = { cells: string[]; accent?: boolean };
 export type Graphic = {
   round: number;
@@ -131,13 +131,13 @@ function base(
   c.fillRect(0, 0, width, height);
   c.fillStyle = '#e6c66b';
   c.fillRect(0, 0, width, 12);
-  text(c, 'RLS1 eSPORTS / SEASON 01', 40, 42, width - 80, 22, '#b5c2d6', true);
+  text(c, `RLS1 eSPORTS / ${SEASON.label.toUpperCase()}`, 40, 42, width - 80, 22, '#b5c2d6', true);
   text(c, title, 40, 90, width - 80, 42, '#ffffff', true);
   text(
     c,
     round
       ? `ROUND ${String(round).padStart(2, '0')} · ${schedule.find((e) => e.round === round)?.country.toUpperCase() || ''}`
-      : 'SEASON 01 · THE TITLE FIGHT',
+      : `${SEASON.label.toUpperCase()} · THE TITLE FIGHT`,
     40,
     155,
     width - 80,
@@ -161,12 +161,14 @@ export function drawResultGraphic(canvas: HTMLCanvasElement, g: Graphic) {
   const footer = g.footer.join('\n');
   font(c);
   const footerHeight = footer ? wrapText(c, footer, 1100).length * 33 + 24 : 0;
+  // Label/value cards (e.g. the round recap) have no column header band.
+  const tableTop = g.headers.some(Boolean) ? 310 : 262;
   base(
     canvas,
     g.title,
     g.round,
     1200,
-    330 + heights.reduce((a, b) => a + b, 0) + footerHeight + 60,
+    tableTop + 20 + heights.reduce((a, b) => a + b, 0) + footerHeight + 60,
   );
   text(c, g.subtitle, 40, 215, 1120, 18, '#a7b6ca');
   let x = 40;
@@ -174,7 +176,7 @@ export function drawResultGraphic(canvas: HTMLCanvasElement, g: Graphic) {
     text(c, h, x, 267, g.widths[i] - 20, 16, '#a7b6ca', true);
     x += g.widths[i];
   });
-  let y = 310;
+  let y = tableTop;
   g.rows.forEach((r, i) => {
     c.fillStyle = r.accent ? '#292618' : i % 2 ? '#101826' : '#151f2e';
     c.fillRect(30, y, 1140, heights[i] - 4);
@@ -301,11 +303,12 @@ export function standingsGraphic(
   rows: Standing[],
   teams: boolean,
   count: number,
+  through?: number,
 ): Graphic {
   return {
     round: 0,
     title: teams ? 'CONSTRUCTORS CHAMPIONSHIP' : 'DRIVERS CHAMPIONSHIP',
-    subtitle: `SEASON 01 · AFTER ${count} PUBLISHED ROUNDS`,
+    subtitle: `${SEASON.label.toUpperCase()} · ${through ? `AFTER ROUND ${String(through).padStart(2, '0')} · ` : 'AFTER '}${count} PUBLISHED ROUNDS`,
     headers: [
       'POS',
       teams ? 'TEAM' : 'DRIVER / TEAM',
@@ -325,5 +328,35 @@ export function standingsGraphic(
       ],
     })),
     footer: ['Official RLS1 standings · Published race classifications'],
+  };
+}
+
+export type RecapInput = {
+  pole?: { driver: string; team: string; ms?: number };
+  duelWinner?: { driver: string; team: string };
+  raceWinner?: { driver: string; team: string };
+  fastestLap?: { driver: string; ms: number };
+  leader?: { name: string; points: number };
+};
+// One-card summary of a completed round. Every line comes from published
+// classifications; missing items read "Not published" rather than guessing.
+export function recapGraphic(round: number, r: RecapInput): Graphic {
+  const line = (label: string, value?: string) => ({
+    cells: [label, value || 'Not published'],
+  });
+  return {
+    round,
+    title: 'ROUND RECAP',
+    subtitle: 'OFFICIAL RESULTS',
+    headers: ['', ''],
+    widths: [360, 740],
+    rows: [
+      line('POLE POSITION', r.pole && `${r.pole.driver}${r.pole.ms ? ` · ${formatLap(r.pole.ms)}` : ''}\n${r.pole.team}`),
+      line('DUEL WINNER', r.duelWinner && `${r.duelWinner.driver}\n${r.duelWinner.team}`),
+      { ...line('RACE WINNER', r.raceWinner && `${r.raceWinner.driver}\n${r.raceWinner.team}`), accent: true },
+      line('FASTEST DUEL LAP', r.fastestLap && `${r.fastestLap.driver} · ${formatLap(r.fastestLap.ms)}`),
+      line('CHAMPIONSHIP LEADER', r.leader && `${r.leader.name} · ${r.leader.points} PTS`),
+    ],
+    footer: [],
   };
 }

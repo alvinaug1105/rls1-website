@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { SEASON } from './season';
 import { Flag } from 'lucide-react';
 import {
   Dialog,
@@ -31,7 +32,7 @@ export function ScoringRules() {
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
-          <DialogTitle>Season 1 scoring</DialogTitle>
+          <DialogTitle>{SEASON.label} scoring</DialogTitle>
           <DialogDescription>
             Points awarded by race control count toward the championship.
           </DialogDescription>
@@ -50,4 +51,21 @@ export function ScoringRules() {
     </>
   );
 }
-export { useLeagueClock as useClock } from './league-clock';
+// A horizontally scrollable table/chart region. WCAG 2.1.1 requires scrollable
+// content to be reachable by keyboard, so the labelled region is focusable.
+export function ScrollRegion({
+  label,
+  className = 'table-scroll',
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    // eslint-disable-next-line jsx-a11y/prefer-tag-over-role, jsx-a11y/no-noninteractive-tabindex -- Focusable, labelled scroll container for keyboard users (WCAG 2.1.1); a <section> landmark per table would be noisier.
+    <div className={className} role="region" aria-label={label} tabIndex={0}>
+      {children}
+    </div>
+  );
+}

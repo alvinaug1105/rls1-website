@@ -12,6 +12,7 @@ import {
   type MatchId,
 } from './duel';
 import { roundNumber, roundTitle, schedule } from './season';
+import { EmptyState } from './race-ui';
 import { formatLap, parseLap } from './result-utils';
 import {
   Dialog,
@@ -19,6 +20,11 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+const stageTitles: [string, number[]][] = [
+  ['Quarter-finals', [0, 1, 2, 3]],
+  ['Semi-finals', [4, 5]],
+  ['Final', [6]],
+];
 export function DuelView({
   data,
   round,
@@ -34,17 +40,21 @@ export function DuelView({
     record = draft || publishedDuel(data, round);
   if (seeds.length < 2)
     return (
-      <section className="panel">
-        <h3>Duel</h3>
-        <p>Awaiting qualifying classification.</p>
-        <p className="muted">
-          At least two classified drivers are needed for a Duel.
-        </p>
+      <section className="panel duel-panel" aria-labelledby={`duel-title-${round}`}>
+        <p className="eyebrow">DUEL</p>
+        <h2 id={`duel-title-${round}`} className="section-title">
+          Duel bracket
+        </h2>
+        <EmptyState title="Awaiting qualifying classification">
+          The top eight qualifiers are seeded into the Duel (P1 v P8, P4 v P5,
+          P2 v P7, P3 v P6). At least two classified drivers are needed.
+        </EmptyState>
       </section>
     );
   const matches = duelBracket(seeds, record?.winners),
     champion = matches[6].winner,
     fastest = duelFastest(record);
+  const seed = (driver: string) => seeds.findIndex((s) => s.driver === driver) + 1;
   const stale =
     !draft &&
     !record &&
@@ -52,102 +62,143 @@ export function DuelView({
       (e) =>
         e.kind === 'duel' && e.approved === 1 && roundNumber(e.title) === round,
     );
+  const state = stale
+    ? 'Qualifying was updated after this bracket was published. Race control must review and republish it.'
+    : !record
+      ? 'Bracket seeded from qualifying · awaiting results.'
+      : champion
+        ? 'Duel complete.'
+        : 'Duel in progress.';
   return (
-    <section className="panel duel-panel">
-      <h3>Duel</h3>
-      
-      <p className="muted">
-        {stale
-          ? 'Qualifying was updated. The organiser must review and republish this bracket.'
-          : !record
-            ? 'Bracket awaiting results.'
-            : champion
-              ? 'Duel complete.'
-              : 'Duel in progress.'}{' '}
+    <section className="panel duel-panel" aria-labelledby={`duel-title-${round}`}>
+      <div className="sectionhead">
+        <div>
+          <p className="eyebrow">DUEL</p>
+          <h2 id={`duel-title-${round}`} className="section-title">
+            Duel bracket
+          </h2>
+        </div>
+        <span className={`badge${champion ? ' verified' : ''}`}>
+          {draft ? 'Draft preview' : champion ? 'Complete' : record ? 'In progress' : 'Seeded'}
+        </span>
+      </div>
+      <p className={stale ? 'formstatus' : 'muted'}>
+        {state}{' '}
         {seeds.length < 8
-          ? 'Empty qualifying slots are byes.'
-          : 'Top 8 qualifying drivers.'}
+          ? `${seeds.length} qualifiers · empty slots are byes.`
+          : 'Top eight qualifiers.'}
       </p>
       <div className="duel-bracket">
-        {(
-          [
-            ['Quarter-finals', matches.slice(0, 4)],
-            ['Semi-finals', matches.slice(4, 6)],
-            ['Final', matches.slice(6)],
-          ] as [string, typeof matches][]
-        ).map(([title, group]) => (
-          <div className="duel-column" key={String(title)}>
-            <h4>{String(title)}</h4>
-            <div className="duel-matches">
-              {(group as typeof matches).map((m) => (
-                <article className="duel-match" key={m.id}>
-                  <p className="eyebrow">
-                    {m.id}
-                    {m.bye ? ' · BYE' : ''}
-                  </p>
-                  {m.players.map((p) => (
-                    <div
-                      className={
-                        m.winner?.driver === p.driver
-                          ? 'duel-winner'
-                          : m.winner
-                            ? 'duel-eliminated'
-                            : ''
-                      }
-                      key={p.driver}
+        {stageTitles.map(([title, ids]) => (
+          <section className="duel-column" key={title} aria-label={title}>
+            <h3 className="duel-stage">{title}</h3>
+            <ol className="duel-matches">
+              {ids.map((index) => {
+                const m = matches[index];
+                const summary = !m.ready
+                  ? 'awaiting previous match'
+                  : !m.players.length
+                    ? 'empty slot'
+                    : m.bye
+                      ? `${m.players[0].driver} advances with a bye`
+                      : m.winner
+                        ? `won by ${m.winner.driver}`
+                        : 'result pending';
+                return (
+                  <li key={m.id}>
+                    <article
+                      className="duel-match"
+                      data-decided={m.winner ? 'true' : undefined}
+                      aria-label={`${m.id}: ${m.players.map((p) => `${p.driver} (qualified P${seed(p.driver)})`).join(' versus ') || 'no drivers'}, ${summary}`}
                     >
-                      <strong>
-                        P{seeds.findIndex((s) => s.driver === p.driver) + 1} ·{' '}
-                        {p.driver}
-                        {m.winner?.driver === p.driver ? ' ✓' : ''}
-                      </strong>
-                      <small>
-                        {p.team}
-                        {record?.laps[p.driver]
-                          ? ` · ${formatLap(record.laps[p.driver])}`
-                          : ''}
-                      </small>
-                    </div>
-                  ))}
-                  {!m.ready && <p className="muted">Awaiting previous match</p>}
-                  {m.ready && !m.players.length && (
-                    <p className="muted">Empty bracket slot</p>
-                  )}
-                  {onWinner && m.ready && m.players.length === 2 && (
-                    <label>
-                      Winner
-                      <select
-                        aria-label={`${m.id} winner`}
-                        value={record?.winners[m.id] || ''}
-                        onChange={(e) => onWinner(m.id, e.target.value)}
-                      >
-                        <option value="">Not decided</option>
-                        {m.players.map((p) => (
-                          <option key={p.driver}>{p.driver}</option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-                  {!onWinner && m.winner && <p>Advances: {m.winner.driver}</p>}
-                </article>
-              ))}
-            </div>
-          </div>
+                      <p className="duel-match-id">
+                        {m.id}
+                        {m.bye ? ' · BYE' : ''}
+                      </p>
+                      {m.players.map((p) => {
+                        const won = m.winner?.driver === p.driver;
+                        const out = !!m.winner && !won;
+                        return (
+                          <div
+                            className={`duel-player${won ? ' duel-winner' : ''}${out ? ' duel-eliminated' : ''}`}
+                            key={p.driver}
+                          >
+                            <span className="seed" title={`Qualified P${seed(p.driver)}`}>
+                              P{seed(p.driver)}
+                            </span>
+                            <span className="duel-driver">
+                              <strong>{p.driver}</strong>
+                              <small>
+                                {p.team}
+                                {record?.laps[p.driver]
+                                  ? ` · ${formatLap(record.laps[p.driver])}`
+                                  : ''}
+                              </small>
+                            </span>
+                            {won && (
+                              <span className="duel-result" title="Advances">
+                                <span aria-hidden="true">✓</span>
+                                <span className="sr-only">Advances</span>
+                              </span>
+                            )}
+                            {out && <span className="duel-result">Out</span>}
+                          </div>
+                        );
+                      })}
+                      {!m.ready && <p className="duel-wait">Awaiting previous match</p>}
+                      {m.ready && !m.players.length && (
+                        <p className="duel-wait">Empty bracket slot</p>
+                      )}
+                      {m.ready && m.players.length === 2 && !m.winner && !onWinner && (
+                        <p className="duel-wait">Result pending</p>
+                      )}
+                      {onWinner && m.ready && m.players.length === 2 && (
+                        <label>
+                          Winner
+                          <select
+                            aria-label={`${m.id} winner`}
+                            value={record?.winners[m.id] || ''}
+                            onChange={(e) => onWinner(m.id, e.target.value)}
+                          >
+                            <option value="">Not decided</option>
+                            {m.players.map((p) => (
+                              <option key={p.driver}>{p.driver}</option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+                    </article>
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
         ))}
+        <section className="duel-column duel-column-winner" aria-label="Duel winner">
+          <h3 className="duel-stage">Duel winner</h3>
+          <div className={`duel-champion${champion ? '' : ' is-pending'}`}>
+            {champion ? (
+              <>
+                <p className="eyebrow">
+                  <span aria-hidden="true">🏆</span> DUEL WINNER
+                </p>
+                <p className="duel-champion-name">{champion.driver}</p>
+                <p className="muted">
+                  {champion.team} · qualified P{seed(champion.driver)}
+                </p>
+              </>
+            ) : (
+              <p className="muted">Decided in the Final.</p>
+            )}
+            {fastest && (
+              <p className="duel-fastest">
+                <span className="eyebrow">FASTEST DUEL LAP</span>
+                <strong>{formatLap(fastest[1])}</strong> {fastest[0]}
+              </p>
+            )}
+          </div>
+        </section>
       </div>
-      {champion && (
-        <div className="duel-champion">
-          <p className="eyebrow">DUEL WINNER</p>
-          <h3>{champion.driver}</h3>
-          <p>{roundTitle(round)}</p>
-        </div>
-      )}
-      {fastest && (
-        <p>
-          <strong>FASTEST DUEL LAP</strong> · {fastest[0]} —{' '}
-          {formatLap(fastest[1])}
-        </p>
-      )}
     </section>
   );
 }
@@ -337,13 +388,43 @@ export function DuelEditor({
               ? 'This replaces the published Duel. Review every winner before confirming.'
               : 'Review the bracket before publishing. This does not change the official race classification or points.'}
           </DialogDescription>
+          {preview && (() => {
+            const bracket = duelBracket(seeds, preview.winners);
+            const lap = duelFastest(preview);
+            return (
+              <div className="impact">
+                <p className="eyebrow">WHAT CHANGES</p>
+                <ul>
+                  <li>
+                    {bracket.filter((m) => m.winner && !m.bye).length} of{' '}
+                    {bracket.filter((m) => !m.bye && (m.players.length === 2 || !m.ready)).length}{' '}
+                    matches decided
+                  </li>
+                  <li>
+                    Duel winner:{' '}
+                    <strong>{bracket[6].winner?.driver ?? 'not decided yet'}</strong>
+                  </li>
+                  <li>
+                    Fastest Duel lap:{' '}
+                    {lap ? `${lap[0]} · ${formatLap(lap[1])}` : 'not recorded'}
+                  </li>
+                  <li>Race classification and championship points are not changed.</li>
+                </ul>
+              </div>
+            );
+          })()}
           {preview && (
             <DuelView data={league.data} round={round} draft={preview} />
           )}
           <p role="alert">{message}</p>
-          <button className="primary" disabled={busy} onClick={publish}>
-            {busy ? 'Publishing…' : 'Publish Duel'}
-          </button>
+          <div className="formactions">
+            <button className="outline" disabled={busy} onClick={() => setPreview(null)}>
+              Keep editing
+            </button>
+            <button className="primary" disabled={busy} onClick={publish}>
+              {busy ? 'Publishing…' : baseline.id ? 'Replace published Duel' : 'Publish Duel'}
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

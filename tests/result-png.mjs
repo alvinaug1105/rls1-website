@@ -124,3 +124,19 @@ for (const teams of [false, true]) {
 console.log(
   'PASS: WDC and WCC images preserve supplied standings, full names and points.',
 );
+const through = png.standingsGraphic([], false, 5, 8);
+assert.match(through.subtitle, /AFTER ROUND 08 · 5 PUBLISHED ROUNDS/);
+const recap = png.recapGraphic(8, {
+  pole: { driver: rows[0].driver, team: rows[0].team, ms: 64117 },
+  raceWinner: { driver: rows[1].driver, team: rows[1].team },
+  fastestLap: { driver: rows[2].driver, ms: 64001 },
+  leader: { name: rows[3].driver, points: 192 },
+});
+assert.equal(recap.rows.length, 5);
+assert.equal(recap.rows[1].cells[1], 'Not published', 'Missing Duel winner is never guessed');
+assert(recap.rows[0].cells[1].includes('1:04.117'));
+assert(recap.rows[4].cells[1].endsWith('192 PTS'));
+png.drawResultGraphic(canvas, recap);
+assert.equal(canvas.width, 1200);
+bounds();
+console.log('PASS: round recap and through-round standings graphics, long names within bounds.');

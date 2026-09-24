@@ -158,7 +158,8 @@ export function PublishingDesk({
           <article className="review desk-post" key={e.id}>
             <div>
               <p className="eyebrow">
-                {e.kind} ·{' '}
+                {e.kind === 'penalty' ? 'steward decision' : e.kind} ·{' '}
+                {roundNumber(e.title) ? `Round ${roundNumber(e.title)} · ` : ''}
                 {e.approved === 1
                   ? 'Published'
                   : e.approved === 0
@@ -166,14 +167,21 @@ export function PublishingDesk({
                     : 'Rejected'}
               </p>
               <h3>{e.title}</h3>
-              <p className="footnote">{e.author}</p>
+              <p className="footnote">
+                {e.author}
+                {Number.isFinite(Date.parse(e.created))
+                  ? ` · ${new Date(e.created).toLocaleString('en-GB', { timeZone: 'Asia/Hong_Kong', dateStyle: 'medium', timeStyle: 'short' })} HKT`
+                  : ''}
+              </p>
             </div>
             <div className="formactions">
               {['race', 'qualifying'].includes(e.kind) ? (
                 <>
                   <a
                     className="outline"
-                    href={`/#round-${e.title.match(/Round (\d+)/i)?.[1] || ''}`}
+                    href={`/rounds/${roundNumber(e.title)}${e.kind === 'race' ? '#race' : '#qualifying'}`}
+                    target="_blank"
+                    rel="noopener"
                   >
                     View public result
                   </a>
@@ -197,7 +205,7 @@ export function PublishingDesk({
                   </button>
                   {!e.id.startsWith('archive-') && (
                     <button
-                      className="outline"
+                      className="danger"
                       onClick={() => {
                         setSelected(e);
                         setAction('delete');
@@ -262,7 +270,11 @@ export function PublishingDesk({
               Cancel
             </button>
             {notice || action ? (
-              <button className="primary" disabled={busy} onClick={submit}>
+              <button
+                className={action === 'delete' || action === 'reject' ? 'danger' : 'primary'}
+                disabled={busy}
+                onClick={submit}
+              >
                 {busy
                   ? 'Saving…'
                   : notice

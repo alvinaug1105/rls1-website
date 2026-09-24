@@ -1,14 +1,15 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { validateClassification } from './validation';
-import { classification } from './racing';
+import { calculateStandings, classification } from './racing';
+import { publishedDuel } from './duel';
 import {
   Dialog,
   DialogContent,
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { parseLap, formatLap } from './result-utils';
+import { parseLap, formatLap, fastestDuel, sortQual } from './result-utils';
 import { Plus, ArrowUp, ArrowDown, Trash2, Save } from 'lucide-react';
 import {
   Combobox,
@@ -40,7 +41,7 @@ import {
   teamFor,
   roster,
 } from './season';
-import type { League } from './league';
+import type { Entry, League } from './league';
 type Draft = {
   driver: string;
   team: string;
@@ -58,6 +59,109 @@ const blank = (): Draft => ({
   duel: '',
 });
 const names = roster.map((r) => r.driver);
+type Classified = { driver: string; team: string; points?: number; ms?: number; attempts?: number; duelMs?: number };
+// What publishing this draft changes. Standings are computed by applying the
+// draft to the real dataset and running the shared calculateStandings, so the
+// preview can never disagree with the public championship tables.
+function Impact({
+  data,
+  kind,
+  round,
+  rows,
+}: {
+  data: Entry[];
+  kind: 'race' | 'qualifying';
+  round: number;
+  rows: Classified[];
+}) {
+  const draft: Entry = {
+    id: 'draft-preview',
+    kind,
+    title: roundTitle(round),
+    body: JSON.stringify(rows),
+    author: 'Race Control',
+    approved: 1,
+    created: new Date().toISOString(),
+  };
+  const after = [
+    ...data.filter((e) => !(e.kind === kind && roundNumber(e.title) === round)),
+    draft,
+  ];
+  if (kind === 'qualifying') {
+    const grid = sortQual(rows);
+    const duelAffected =
+      !!publishedDuel(data, round) &&
+      JSON.stringify(rows) !==
+        data.find((e) => e.kind === 'qualifying' && e.approved === 1 && roundNumber(e.title) === round)?.body;
+    return (
+      <div className="impact">
+        <p className="eyebrow">WHAT CHANGES</p>
+        <ul>
+          <li>{grid.length} classified drivers</li>
+          <li>
+            Pole: <strong>{grid[0]?.driver}</strong>
+            {grid[0]?.ms ? ` · ${formatLap(grid[0].ms)}` : ''}
+          </li>
+          <li>Duel seeds: top {Math.min(8, grid.length)} qualifiers</li>
+        </ul>
+        {duelAffected && (
+          <p className="impact-warning" role="alert">
+            A Duel bracket is already published for this round. It will be
+            marked for review publicly and must be republished from the Duel
+            editor.
+          </p>
+        )}
+      </div>
+    );
+  }
+  const before = calculateStandings(data);
+  const standings = calculateStandings(after).slice(0, 5);
+  const fastest = fastestDuel(rows);
+  return (
+    <div className="impact">
+      <p className="eyebrow">WHAT CHANGES</p>
+      <ul>
+        <li>{rows.length} classified drivers · {rows.reduce((t, r) => t + (r.points ?? 0), 0)} points awarded</li>
+        <li>
+          Winner: <strong>{rows[0]?.driver}</strong>
+        </li>
+        <li>
+          Fastest Duel lap:{' '}
+          {fastest?.duelMs ? `${fastest.driver} · ${formatLap(fastest.duelMs)}` : 'not recorded'}
+        </li>
+        <li>Championship standings update immediately.</li>
+      </ul>
+      <table className="timing impact-table">
+        <caption>Drivers’ championship after publishing (top 5)</caption>
+        <thead>
+          <tr>
+            <th scope="col" className="num">Pos</th>
+            <th scope="col">Driver</th>
+            <th scope="col" className="num">Points</th>
+            <th scope="col" className="num">Change</th>
+          </tr>
+        </thead>
+        <tbody>
+          {standings.map((r) => {
+            const was = before.find((b) => b.name === r.name);
+            const delta = r.points - (was?.points ?? 0);
+            return (
+              <tr key={r.name}>
+                <td className="num">P{r.position}</td>
+                <th scope="row">{r.name}</th>
+                <td className="num">{r.points}</td>
+                <td className="num">
+                  {delta ? `${delta > 0 ? '+' : '−'}${Math.abs(delta)} pts` : '—'}
+                  {was && was.position !== r.position ? ` · was P${was.position}` : ''}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 export function ResultEditor({
   league,
   sessionKind,
@@ -260,7 +364,9 @@ export function ResultEditor({
   return (
     <section data-admin-dirty={dirty} className="panel result-editor">
       <p className="eyebrow">RESULT MANAGER</p>
-      <h3>Add or update a classification</h3>
+      <h2 className="section-title">
+        Round {String(round).padStart(2, '0')} {kind === 'race' ? 'race classification' : 'qualifying classification'}
+      </h2>
       <p className="muted">
         Choose a round, open the classification, then save your changes.
         Qualifying appears on the Results page as soon as it is published.
@@ -333,7 +439,7 @@ export function ResultEditor({
                   kind === 'race' ? 'POINTS' : 'LAP',
                   kind === 'race' ? 'BEST DUEL LAP' : 'ATTEMPTS',
                   ...(kind === 'race' ? ['ORDER'] : []),
-                  '',
+                  'REMOVE',
                 ].map((x, i) => (
                   <TableHead key={i}>{x}</TableHead>
                 ))}
@@ -536,7 +642,8 @@ export function ResultEditor({
       <Dialog open={preview} onOpenChange={(v) => !busy && setPreview(v)}>
         <DialogContent className="composer">
           <DialogTitle>
-            Review {kind === 'race' ? 'race results' : 'qualifying'}
+            Publish Round {String(round).padStart(2, '0')}{' '}
+            {kind === 'race' ? 'race result' : 'qualifying'}?
           </DialogTitle>
           <DialogDescription>
             {existing &&
@@ -546,6 +653,13 @@ export function ResultEditor({
             {roundTitle(round)} · Confirm the classification before it becomes
             public.
           </DialogDescription>
+          {preview && (() => {
+            try {
+              return <Impact data={league.data} kind={kind} round={round} rows={validated()} />;
+            } catch {
+              return null;
+            }
+          })()}
           <div className="preview-rows">
             {preview &&
               [...rows]
@@ -573,13 +687,18 @@ export function ResultEditor({
             </p>
           )}
           <p aria-live="polite">{message}</p>
-          <button className="primary" disabled={busy} onClick={save}>
-            {busy
-              ? 'Publishing…'
-              : existing
-                ? 'Replace result'
-                : 'Confirm & publish'}
-          </button>
+          <div className="formactions">
+            <button className="outline" disabled={busy} onClick={() => setPreview(false)}>
+              Keep editing
+            </button>
+            <button className="primary" disabled={busy} onClick={save}>
+              {busy
+                ? 'Publishing…'
+                : existing
+                  ? `Replace official ${kind === 'race' ? 'result' : 'qualifying'}`
+                  : `Publish official ${kind === 'race' ? 'result' : 'qualifying'}`}
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
     </section>

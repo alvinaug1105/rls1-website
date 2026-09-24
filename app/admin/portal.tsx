@@ -2,17 +2,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { BrowserLink as Link } from '../browser-link';
 import { MediaCentre } from './media-centre';
-import { SessionCountdown } from '../session-countdown';
-import { useClock } from '../race-ui';
+import { MINUTE, useLeagueClock } from '../league-clock';
+import { RoundControl } from './ops';
+import { Deadline } from '../deadline';
 import { Flag, ShieldCheck, ArrowUpRight, LogOut, Menu } from 'lucide-react';
 import { useLeague } from '../league';
 import { DuelEditor } from '../duel-ui';
 import { ResultEditor } from '../result-editor';
 import { EventEditor } from '../event-editor';
 import { Championship } from '../championship';
-import { DriverProfiles } from '../season-views';
-import { nextEvent, raceEntries } from '../racing';
-import { roundNumber } from '../season';
+import { DriverProfiles } from '../drivers-view';
+import { getCurrentLeagueRound } from '../racing';
+import { schedule, SEASON } from '../season';
 import { PublishingDesk } from '../publishing-desk';
 import {
   Dialog,
@@ -35,10 +36,16 @@ const modules = [
   ['publishing', 'Publishing desk', 'Publishing'],
 ];
 const href = (id: string) => (id === 'dashboard' ? '/admin' : `/admin/${id}`);
-export function AdminLogin() {
+export function AdminLogin({ notice }: { notice?: 'error' | 'expired' }) {
   const [visible, setVisible] = useState(false),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useState(
+      notice === 'error'
+        ? 'Key not accepted. Check your organiser key and try again.'
+        : notice === 'expired'
+          ? 'Your session ended. Sign in again to continue.'
+          : '',
+    );
   async function signIn(form: HTMLFormElement) {
     if (busy) return;
     setBusy(true);
@@ -66,12 +73,16 @@ export function AdminLogin() {
       </Link>
       <section className="panel login-card">
         <ShieldCheck size={36} />
-        <p className="eyebrow">LEAGUE OPERATIONS / SEASON 01</p>
+        <p className="eyebrow">LEAGUE OPERATIONS / {SEASON.label.toUpperCase()}</p>
         <h1>League control centre</h1>
         <p className="muted">
           Organiser access only. Sign in to manage the league.
         </p>
+        {/* method/action make a pre-hydration submit a same-origin POST, so the
+            key can never be serialised into the page URL. */}
         <form
+          method="post"
+          action="/api/admin/session"
           onSubmit={(e) => {
             e.preventDefault();
             void signIn(e.currentTarget);
@@ -175,10 +186,10 @@ export function AdminPortal({
       setBusy(false);
     }
   }
-  const now = useClock();
-  const upcoming = nextEvent(league.data, now ?? 0),
-    races = raceEntries(league.data),
-    latest = races[races.length - 1],
+  // Minute resolution: editors must not re-render every second.
+  const now = useLeagueClock(MINUTE);
+  const upcoming = now === null ? undefined : getCurrentLeagueRound(league.data, now),
+    defaultRound = initialRound ?? upcoming?.round ?? schedule.length,
     pending = league.data.filter(
       (e) => ['story', 'video'].includes(e.kind) && e.approved === 0,
     ).length;
@@ -190,6 +201,8 @@ export function AdminPortal({
         if (
           link &&
           link.origin === location.origin &&
+          link.target !== '_blank' &&
+          !link.hasAttribute('download') &&
           !e.metaKey &&
           !e.ctrlKey &&
           !e.shiftKey &&
@@ -259,8 +272,10 @@ export function AdminPortal({
             <h1>{modules.find((m) => m[0] === section)?.[1]}</h1>
             <p className="muted">
               {section === 'dashboard'
-                ? 'League control centre. Every update starts here.'
-                : section === 'media' ? 'Generate official graphics from published league results.' : 'Review your changes before publishing to the public site.'}
+                ? 'Race operations for the selected round. Every action opens the specialist editor.'
+                : section === 'media'
+                  ? 'Generate official graphics from published league results.'
+                  : 'Review your changes before publishing to the public site.'}
             </p>
           </div>
           {(error || league.error) && (
@@ -271,8 +286,11 @@ export function AdminPortal({
               </button>
             </p>
           )}
-          {league.loading && !league.isAdmin ? (
-            <output className="panel">Loading league records…</output>
+          {(league.loading && !league.isAdmin) || now === null ? (
+            <output className="panel admin-loading">
+              <span className="skeleton-line wide" />
+              Loading league records…
+            </output>
           ) : !league.isAdmin ? (
             <section className="panel">
               Admin records are unavailable. Retry before editing.
@@ -280,68 +298,19 @@ export function AdminPortal({
           ) : (
             <>
               {section === 'dashboard' && (
-                <>
-                  <div className="admin-stats">
-                    <Link className="panel" href="/admin/events">
-                      <p className="eyebrow">CURRENT / UPCOMING ROUND</p>
-                      <h2>
-                        {upcoming
-                          ? `Round ${upcoming.round}`
-                          : 'Season complete'}
-                      </h2>
-                      <p>{upcoming?.country || 'No upcoming event'}</p>{upcoming && <SessionCountdown event={upcoming} data={league.data} />}
-                      <span>Edit event →</span>
-                    </Link>
-                    <Link className="panel" href="/admin/standings">
-                      <p className="eyebrow">CHAMPIONSHIP</p>
-                      <h2>
-                        {latest
-                          ? `Round ${roundNumber(latest.title)}`
-                          : 'Awaiting results'}
-                      </h2>
-                      <p>Latest published race</p>
-                      <span>View standings →</span>
-                    </Link>
-                    <Link className="panel" href="/admin/results">
-                      <p className="eyebrow">LATEST RESULT</p>
-                      <h2>{latest ? latest.title : 'No results yet'}</h2>
-                      <span>Manage results →</span>
-                    </Link>
-                    <Link className="panel" href="/admin/submissions">
-                      <p className="eyebrow">PENDING REVIEW</p>
-                      <h2>{pending}</h2>
-                      <p>Guest submissions</p>
-                      <span>Review posts →</span>
-                    </Link>
-                  </div>
-                  <section className="panel">
-                    <p className="eyebrow">QUICK ACTIONS</p>
-                    <h2>Manage your league</h2>
-                    <div className="admin-shortcuts">
-                      {modules.slice(1).map(([id, label]) => (
-                        <Link className="outline" href={href(id)} key={id}>
-                          {label} →
-                        </Link>
-                      ))}
-                    </div>
-                  </section>
-                  <section className="panel">
-                    <h3>From draft to published</h3>
-                    <p className="muted">
-                      Choose a module, select the round, edit and preview.
-                      Confirm publication only when the details are ready.
-                      Browser drafts stay on this device; published records are
-                      shared with everyone.
-                    </p>
-                  </section>
-                </>
+                <RoundControl
+                  data={league.data}
+                  round={defaultRound}
+                  current={upcoming?.round}
+                  now={now!}
+                />
               )}
-              {section === 'media' && <MediaCentre data={league.data} initialRound={initialRound} />}
+              {section === 'media' && <MediaCentre data={league.data} initialRound={defaultRound} />}
               {section === 'events' && (
                 <EventEditor
                   league={league}
                   fixedMode="event"
-                  initialRound={initialRound ?? upcoming?.round ?? 24}
+                  initialRound={defaultRound}
                 />
               )}
               {section === 'stewarding' && (
@@ -349,7 +318,7 @@ export function AdminPortal({
                   <EventEditor
                     league={league}
                     fixedMode="penalty"
-                    initialRound={initialRound ?? upcoming?.round ?? 24}
+                    initialRound={defaultRound}
                   />
                   <PublishingDesk league={league} mode="stewarding" />
                 </>
@@ -358,20 +327,20 @@ export function AdminPortal({
                 <ResultEditor
                   league={league}
                   sessionKind="qualifying"
-                  initialRound={initialRound ?? upcoming?.round ?? 24}
+                  initialRound={defaultRound}
                 />
               )}
               {section === 'duel' && (
                 <DuelEditor
                   league={league}
-                  initialRound={initialRound ?? upcoming?.round ?? 24}
+                  initialRound={defaultRound}
                 />
               )}
               {section === 'results' && (
                 <ResultEditor
                   league={league}
                   sessionKind="race"
-                  initialRound={initialRound ?? upcoming?.round ?? 24}
+                  initialRound={defaultRound}
                 />
               )}
               {section === 'standings' && (
@@ -394,7 +363,16 @@ export function AdminPortal({
                 <PublishingDesk league={league} mode="submissions" />
               )}
               {section === 'publishing' && (
-                <PublishingDesk league={league} mode="publishing" />
+                <>
+                  <PublishingDesk league={league} mode="publishing" />
+                  <section className="panel" aria-labelledby="deadline-title">
+                    <p className="eyebrow">DISCORD HELPER</p>
+                    <h2 id="deadline-title" className="section-title">
+                      Make a local-time deadline
+                    </h2>
+                    <Deadline />
+                  </section>
+                </>
               )}
             </>
           )}
