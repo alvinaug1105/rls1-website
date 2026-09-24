@@ -35,7 +35,8 @@ export function EventEditor({
     [message, setMessage] = useState(''),
     [busy, setBusy] = useState(false),
     [published, setPublished] = useState(false),
-    [dirty, setDirty] = useState(false);
+    [dirty, setDirty] = useState(false),
+    [revision, setRevision] = useState(0);
   const [baseline, setBaseline] = useState(() => {
     const e = league.data.find(
       (e) => e.kind === 'event' && roundNumber(e.title) === initialRound,
@@ -103,9 +104,15 @@ export function EventEditor({
           body: preview.body,
         });
       setPreview(null);
-      setPublished(true);
+      setPublished(mode === 'event');
       setDirty(false);
-      setMessage('Published successfully.');
+      // A new blank form prevents publishing the same decision twice.
+      if (mode === 'penalty') setRevision((r) => r + 1);
+      setMessage(
+        mode === 'event'
+          ? 'Event information published.'
+          : 'Steward decision published. The form is ready for the next decision.',
+      );
       await league.refresh();
     } catch (e) {
       setMessage((e as Error).message);
@@ -115,9 +122,9 @@ export function EventEditor({
   }
   return (
     <section className="panel" data-admin-dirty={dirty}>
-      <h3>
+      <h2 className="section-title">
         {mode === 'event' ? 'Edit event information' : 'New steward decision'}
-      </h3>
+      </h2>
       <div className="formactions">
         <Select
           disabled={dirty || busy}
@@ -167,7 +174,7 @@ export function EventEditor({
         )}
       </div>
       <form
-        key={`${round}-${mode}`}
+        key={`${round}-${mode}-${revision}`}
         onReset={() => {
           setDirty(false);
           setPublished(false);

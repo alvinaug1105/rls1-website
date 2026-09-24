@@ -196,15 +196,6 @@ export function getCurrentLeagueRound(data: Entry[], now: number) {
 }
 // Compatibility for existing callers; all selection uses one race-week policy.
 export const nextEvent = getCurrentLeagueRound;
-export function dateLabel(date: string) {
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'UTC',
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(date + 'T12:00:00Z'));
-}
 const escapeICS = (text: string) =>
   text
     .replace(/\\/g, '\\\\')

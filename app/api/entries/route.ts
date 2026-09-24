@@ -1,29 +1,24 @@
 import { limitedText, BodyLimitError } from '@/lib/request-body';
-import { validateDuel } from '@/app/duel';
+import { json, sameOrigin, requestId, logServerError } from '@/lib/http';
+import { validateDuel, qualifyingFor } from '@/app/duel';
 import type { Entry } from '@/app/league';
 import { mergeArchive, roundNumber } from '@/app/season';
 import { validateOfficial } from '@/app/validation';
 import { getDb } from '@/db';
 import { entries } from '@/db/schema';
-import { eq, desc, and, gte, count } from 'drizzle-orm';
+import { eq, desc, and, gte, count, sql, type SQL } from 'drizzle-orm';
 import { admin } from '@/lib/organiser-auth';
 const official = ['race', 'qualifying', 'event', 'penalty', 'notice', 'duel'];
 const singleton = ['race', 'qualifying', 'event', 'duel'];
-const json = (body: unknown, status = 200) =>
-  Response.json(body, {
-    status,
-    headers: {
-      'Cache-Control': 'no-store',
-      Vary: 'Cookie, x-league-key',
-      'X-Content-Type-Options': 'nosniff',
-    },
-  });
+// Responses depend on the organiser credential, so caches must key on it.
+const reply = (body: unknown, status = 200) =>
+  json(body, status, { Vary: 'Cookie, x-league-key' });
 export async function GET(req: Request) {
   try {
     const isAdmin =
       new URL(req.url).searchParams.get('admin') === '1' && (await admin(req));
     if (new URL(req.url).searchParams.get('admin') === '1' && !isAdmin)
-      return json({ error: 'Your session has expired. Sign in again.' }, 401);
+      return reply({ error: 'Your session has expired. Sign in again.' }, 401);
     const data = await getDb()
       .select({
         id: entries.id,
@@ -37,34 +32,33 @@ export async function GET(req: Request) {
       .from(entries)
       .where(isAdmin ? undefined : eq(entries.approved, 1))
       .orderBy(desc(entries.created));
-    return json({ data, isAdmin });
-  } catch {
-    return json(
+    return reply({ data, isAdmin });
+  } catch (e) {
+    logServerError('entries GET', requestId(req), e);
+    return reply(
       { error: 'The league archive is unavailable. Please try again shortly.' },
       503,
     );
   }
 }
 export async function POST(req: Request) {
-  if (req.headers.get('origin') !== new URL(req.url).origin)
-    return json({ error: 'Invalid origin.' }, 403);
+  if (!sameOrigin(req)) return reply({ error: 'Invalid origin.' }, 403);
   const isAdmin =
     new URL(req.url).searchParams.get('public') !== '1' && (await admin(req));
   let data;
   try {
     const raw = await limitedText(req, 50000);
-    if (raw.length > 50000) return json({ error: 'Post is too long.' }, 413);
     data = JSON.parse(raw);
   } catch (e) {
-    return json({ error: e instanceof BodyLimitError ? 'Post is too long.' : 'Invalid submission.' }, e instanceof BodyLimitError ? 413 : 400);
+    return reply({ error: e instanceof BodyLimitError ? 'Post is too long.' : 'Invalid submission.' }, e instanceof BodyLimitError ? 413 : 400);
   }
   if (!data || typeof data !== 'object' || Array.isArray(data))
-    return json({ error: 'Invalid submission.' }, 400);
+    return reply({ error: 'Invalid submission.' }, 400);
   const { kind, title, body } = data;
   if (![...official, 'video', 'story'].includes(kind))
-    return json({ error: 'Invalid post type.' }, 400);
+    return reply({ error: 'Invalid post type.' }, 400);
   if (!isAdmin && official.includes(kind))
-    return json({ error: 'Race control access required.' }, 403);
+    return reply({ error: 'Race control access required.' }, 403);
   try {
     if (
       typeof title !== 'string' ||
@@ -91,7 +85,7 @@ export async function POST(req: Request) {
         throw Error('Use an HTTPS video link and valid notes.');
     }
   } catch (e) {
-    return json(
+    return reply(
       {
         error:
           e instanceof SyntaxError
@@ -101,18 +95,26 @@ export async function POST(req: Request) {
       400,
     );
   }
+  // A Duel is only valid against the exact qualifying classification it was
+  // seeded from. The write below repeats that check inside the same SQL
+  // statement, so a qualifying change between validation and write cannot
+  // produce a published Duel with stale seeds.
+  let duelGuard: SQL | undefined;
   if (kind === 'duel') {
     try {
       const round = roundNumber(title);
       if (!/^Season 1 — Round ([1-9]|1[0-9]|2[0-4]): .+$/.test(title))
-        return json({ error: 'Invalid Duel round title.' }, 400);
-      const current = await getDb()
-        .select()
-        .from(entries)
-        .where(eq(entries.approved, 1));
-      validateDuel(JSON.parse(body), mergeArchive(current) as Entry[], round);
+        return reply({ error: 'Invalid Duel round title.' }, 400);
+      const current = mergeArchive(
+        await getDb().select().from(entries).where(eq(entries.approved, 1)),
+      ) as Entry[];
+      validateDuel(JSON.parse(body), current, round);
+      const seeded = qualifyingFor(current, round)!;
+      duelGuard = seeded.id.startsWith('archive-')
+        ? sql`NOT EXISTS (SELECT 1 FROM entries WHERE kind = 'qualifying' AND id = ${`result-qualifying-${round}`})`
+        : sql`EXISTS (SELECT 1 FROM entries WHERE id = ${seeded.id} AND body = ${seeded.body} AND approved = 1)`;
     } catch {
-      return json({ error: 'Unable to validate Duel. Check the published qualifying and bracket, then retry.' }, 400);
+      return reply({ error: 'Unable to validate Duel. Check the published qualifying and bracket, then retry.' }, 400);
     }
   }
   let guestName = '',
@@ -120,7 +122,7 @@ export async function POST(req: Request) {
   if (!isAdmin) {
     guestName = typeof data.author === 'string' ? data.author.trim() : '';
     if (data.website || guestName.length < 2 || guestName.length > 50)
-      return json(
+      return reply(
         { error: 'Enter a display name between 2 and 50 characters.' },
         400,
       );
@@ -149,7 +151,7 @@ export async function POST(req: Request) {
           ),
         );
       if (recent[0].total >= 5)
-        return json(
+        return reply(
           {
             error:
               'You have submitted five posts recently. Please try again in an hour.',
@@ -170,7 +172,7 @@ export async function POST(req: Request) {
           (match?.id ?? null) !== data.expectedId ||
           (match?.body ?? null) !== data.expectedBody
         )
-          return json(
+          return reply(
             {
               error:
                 'This entry changed since you opened it. Reload and review the latest version before saving.',
@@ -178,18 +180,22 @@ export async function POST(req: Request) {
             409,
           );
         if (match) {
-          const updated = await getDb()
-            .update(entries)
-            .set({ title: title.trim(), body })
-            .where(
-              and(
-                eq(entries.id, match.id),
-                eq(entries.body, data.expectedBody),
-              ),
-            );
+          const updated = duelGuard
+            ? await getDb().run(
+                sql`UPDATE entries SET title = ${title.trim()}, body = ${body} WHERE id = ${match.id} AND body = ${data.expectedBody} AND ${duelGuard}`,
+              )
+            : await getDb()
+                .update(entries)
+                .set({ title: title.trim(), body })
+                .where(
+                  and(
+                    eq(entries.id, match.id),
+                    eq(entries.body, data.expectedBody),
+                  ),
+                );
           return updated.meta.changes
-            ? json({ ok: true })
-            : json(
+            ? reply({ ok: true })
+            : reply(
                 {
                   error:
                     'This entry changed while saving. Reload and review it.',
@@ -198,7 +204,7 @@ export async function POST(req: Request) {
               );
         }
       } else if (match)
-        return json(
+        return reply(
           {
             error:
               'This round already has an entry. Open it in the publishing desk to edit.',
@@ -206,24 +212,38 @@ export async function POST(req: Request) {
           409,
         );
     }
-    const id = singleton.includes(kind)
-      ? `result-${kind}-${roundNumber(title)}`
-      : crypto.randomUUID();
-    await getDb()
-      .insert(entries)
-      .values({
-        id,
-        kind,
-        title: title.trim(),
-        body,
-        author: isAdmin ? 'Race Control' : `Guest · ${guestName}`,
-        userId: isAdmin ? 'race-control' : guestId,
-        approved: isAdmin ? 1 : 0,
-        created: new Date().toISOString(),
-      });
-    return json({ ok: true });
-  } catch {
-    return json(
+    const record = {
+      id: singleton.includes(kind)
+        ? `result-${kind}-${roundNumber(title)}`
+        : crypto.randomUUID(),
+      kind,
+      title: title.trim(),
+      body,
+      author: isAdmin ? 'Race Control' : `Guest · ${guestName}`,
+      userId: isAdmin ? 'race-control' : guestId,
+      approved: isAdmin ? 1 : 0,
+      created: new Date().toISOString(),
+    };
+    // Singleton ids are deterministic, so a concurrent first publication is
+    // reported as a conflict instead of a server error or a duplicate.
+    const inserted = duelGuard
+      ? await getDb().run(
+          sql`INSERT INTO entries (id, kind, title, body, author, user_id, approved, created) SELECT ${record.id}, ${record.kind}, ${record.title}, ${record.body}, ${record.author}, ${record.userId}, ${record.approved}, ${record.created} WHERE ${duelGuard} ON CONFLICT (id) DO NOTHING`,
+        )
+      : await getDb().insert(entries).values(record).onConflictDoNothing();
+    return inserted.meta.changes
+      ? reply({ ok: true })
+      : reply(
+          {
+            error:
+              'This round changed while saving. Reload and review the latest version.',
+          },
+          409,
+        );
+  } catch (e) {
+    const ref = requestId(req);
+    logServerError('entries POST', ref, e);
+    return reply(
       {
         error:
           'Unable to save. Refresh and check whether your entry was published before retrying.',
@@ -233,16 +253,13 @@ export async function POST(req: Request) {
   }
 }
 export async function PATCH(req: Request) {
-  if (
-    req.headers.get('origin') !== new URL(req.url).origin ||
-    !(await admin(req))
-  )
-    return json({ error: 'Race control access required.' }, 403);
+  if (!sameOrigin(req) || !(await admin(req)))
+    return reply({ error: 'Race control access required.' }, 403);
   let data: { id?: unknown; action?: unknown } | null;
   try {
     data = (JSON.parse(await limitedText(req, 4096))) as typeof data;
   } catch (e) {
-    return json({ error: 'Invalid request.' }, e instanceof BodyLimitError ? 413 : 400);
+    return reply({ error: 'Invalid request.' }, e instanceof BodyLimitError ? 413 : 400);
   }
   if (
     !data ||
@@ -251,7 +268,7 @@ export async function PATCH(req: Request) {
     typeof data.action !== 'string' ||
     !['approve', 'reject', 'delete'].includes(data.action)
   )
-    return json({ error: 'Choose a valid post and action.' }, 400);
+    return reply({ error: 'Choose a valid post and action.' }, 400);
   try {
     if (data.action === 'reject') {
       const post = await getDb()
@@ -260,7 +277,7 @@ export async function PATCH(req: Request) {
         .where(eq(entries.id, data.id))
         .get();
       if (!post || !['story', 'video'].includes(post.kind))
-        return json(
+        return reply(
           { error: 'Only guest stories and videos can be rejected.' },
           400,
         );
@@ -273,13 +290,14 @@ export async function PATCH(req: Request) {
             .where(eq(entries.id, data.id))
         : await getDb().delete(entries).where(eq(entries.id, data.id));
     return result.meta.changes
-      ? json({ ok: true })
-      : json(
+      ? reply({ ok: true })
+      : reply(
           { error: 'This post no longer exists. Refresh the publishing desk.' },
           404,
         );
-  } catch {
-    return json(
+  } catch (e) {
+    logServerError('entries PATCH', requestId(req), e);
+    return reply(
       { error: 'Unable to update this post. Please try again.' },
       503,
     );

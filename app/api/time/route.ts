@@ -1,4 +1,6 @@
+import { json } from '@/lib/http';
 export const dynamic = 'force-dynamic';
+// Trusted league time: absolute UTC milliseconds only, never cached.
 export function GET() {
-  return Response.json({ now: Date.now() }, { headers: { 'Cache-Control': 'no-store, max-age=0', 'X-Content-Type-Options': 'nosniff' } });
+  return json({ now: Date.now() });
 }

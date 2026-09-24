@@ -446,7 +446,52 @@ assert.equal(media.mediaGraphics(season.archive, 1).find(g => g.id === 'race').a
 const completedEvent = racing.events(season.archive)[0];
 assert.equal(session.sessionState(completedEvent, season.archive, racing.raceWeekWindow(completedEvent).qualifyingAt).remaining, null);
 assert.equal(session.sessionState(completedEvent, season.archive, racing.raceWeekWindow(completedEvent).qualifyingAt).stage, 'FINISHED');
-for (const file of ['championship.tsx','duel-ui.tsx','qualifying-card.tsx','season-views.tsx']) {
-  assert.doesNotMatch(fs.readFileSync(path.join(root,'app',file),'utf8'), /PngExport|CopyButton|Recap/);
+// Public views stay spectator-only: no PNG/export/publishing controls.
+for (const file of ['championship.tsx','duel-ui.tsx','qualifying-card.tsx','race-card.tsx','round-view.tsx','dashboard.tsx','calendar-view.tsx','drivers-view.tsx','noticeboard.tsx','league-app.tsx']) {
+  assert.doesNotMatch(fs.readFileSync(path.join(root,'app',file),'utf8'), /PngExport|CopyButton|mediaGraphics|drawResultGraphic|toDataURL|Deadline/);
 }
 console.log('Session countdown thresholds and media availability passed.');
+
+const week = load('app/race-week.ts');
+// Stage timeline follows published state and the 21:00 HKT boundary.
+const stages = (d, t) => week.raceWeekStages(scheduled, d, t).map((x) => x.state).join(',');
+assert.equal(stages(clockData, instant(todayEvent.date, '20:59:59')), 'upcoming,upcoming,upcoming');
+assert.equal(stages(clockData, instant(todayEvent.date, '21:00:00')), 'current,upcoming,upcoming');
+assert.equal(stages(withQ, instant(todayEvent.date, '22:00:00')), 'completed,current,upcoming');
+assert.equal(stages(withDuel, instant(todayEvent.date, '22:00:00')), 'completed,completed,current');
+assert.equal(stages([...withDuel, { ...duelQual, id: 'r', kind: 'race', body: '[]' }], weekStart), 'completed,completed,completed');
+// A Duel with no final winner is in progress, not complete.
+const partial = [...withQ, { ...duelQual, kind: 'duel', id: 'duel-partial', body: JSON.stringify({ ...record, winners: { QF1: 'Qualifier 1' } }) }];
+assert.equal(week.duelComplete(partial, todayEvent.round), false);
+assert.equal(stages(partial, instant(todayEvent.date, '22:00:00')), 'completed,current,upcoming');
+// SSR-safe labels never depend on the runtime's ICU data or timezone.
+assert.equal(week.raceWeekLabel(season.schedule[6]), 'Wed 9 Sep – Sun 13 Sep 2026');
+assert.equal(week.raceWeekLabel(season.schedule[23]), 'Wed 6 Jan – Sun 10 Jan 2027');
+assert.equal(week.dayLabel('2026-12-30', true), 'Wed 30 Dec 2026');
+// Round summaries and driver statistics use only published archive data.
+const r5 = week.roundSummary(season.archive, 5);
+assert.equal(r5.pole.driver, 'Winter');
+assert.equal(r5.raceWinner.driver, 'Winter');
+assert.deepEqual([r5.fastestLap.driver, r5.fastestLap.ms, r5.fastestLap.source], ['Winter', 69839, 'race']);
+assert.equal(week.roundSummary(season.archive, 6).raceWinner, undefined);
+assert.equal(week.roundSummary(withDuel, todayEvent.round).fastestLap.source, 'duel');
+const winter = week.driverStats(season.archive, 'Winter');
+assert.deepEqual(
+  [winter.position, winter.points, winter.starts, winter.wins, winter.podiums, winter.poles, winter.fastestLaps, winter.bestFinish],
+  [1, 122, 5, 4, 5, 6, 4, 1],
+);
+const shawn = week.driverStats(season.archive, 'Shawn');
+assert.equal(shawn.name, 'Shawn');
+assert.equal(shawn.points, week.driverStats(season.archive, 'Atlegang').points, 'Shawn and Atlegang are one driver');
+assert.equal(week.leaderThrough(season.archive, 1).points, 26);
+assert.equal(week.leaderThrough(season.archive, 5).points, 122);
+assert.equal(session.formatCountdown(59), '00:00:59');
+assert.equal(session.formatCountdown(90061), '1d 01:01:01');
+assert.equal(session.announcedStart(scheduledEvent, 0), null);
+assert.equal(session.announcedStart({ ...scheduledEvent, startAt: '2026-09-13T13:00:00.000Z' }, Date.parse('2026-09-13T12:00:00Z')).remaining, 3600);
+// Media: recap needs a published race; WDC/WCC count only races through the round.
+const media7 = media.mediaGraphics(season.archive, 3);
+assert.equal(media7.find((g) => g.id === 'recap').available, true);
+assert.equal(media.mediaGraphics(season.archive, 6).find((g) => g.id === 'recap').available, false);
+assert.equal(media.graphicFilename(3, 'wdc'), 'RLS1-S1-R03-wdc.png');
+console.log('PASS: stage timeline states, SSR-safe race-week labels, round summaries, driver statistics, countdown formatting, announced starts and media readiness.');

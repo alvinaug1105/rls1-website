@@ -1,18 +1,22 @@
 'use client';
-import { useClock } from './race-ui';
-import { sessionState } from './session';
+import { useLeagueClock } from './league-clock';
+import { announcedStart, formatCountdown, sessionState } from './session';
 import type { EventInfo } from './racing';
 import type { Entry } from './league';
+// The only component that re-renders every second. Screen readers get a static
+// description of the scheduled time instead of per-second announcements.
 export function SessionCountdown({ event, data }: { event: EventInfo; data: Entry[] }) {
-  const now = useClock();
-  if (now === null) return <p className="muted">Loading session schedule…</p>;
+  const now = useLeagueClock();
+  if (now === null) return <div className="session-countdown is-loading" aria-busy="true"><p className="eyebrow">Next session</p><p className="skeleton-line" /></div>;
   const state = sessionState(event, data, now);
-  const seconds = state.remaining;
-  return <div className="session-countdown" aria-live="off">
-    <p className="eyebrow">{state.notice}</p>
-    {seconds !== null && seconds <= 86400 && <p className="session-digits" aria-label={`Qualifying starts ${state.scheduled}`}>
-      {String(Math.floor(seconds / 3600)).padStart(2, '0')} : {String(Math.floor(seconds % 3600 / 60)).padStart(2, '0')} : {String(seconds % 60).padStart(2, '0')}
-    </p>}
-    {state.scheduled && <p className="muted">{state.scheduled}</p>}
+  const announced = state.remaining === null && state.stage !== 'FINISHED' ? announcedStart(event, now) : null;
+  const seconds = state.remaining ?? announced?.remaining ?? null;
+  const title = state.remaining !== null ? state.notice : announced ? (announced.remaining ? 'ANNOUNCED START IN' : 'ANNOUNCED START') : state.notice;
+  const detail = state.remaining !== null ? `Qualifying · ${state.scheduled}` : announced ? announced.label : state.scheduled;
+  if (state.stage === 'FINISHED') return null;
+  return <div className="session-countdown">
+    <p className="eyebrow">{title}</p>
+    {seconds !== null && <p className="session-digits"><span aria-hidden="true">{formatCountdown(seconds)}</span><span className="sr-only">Starts {detail}</span></p>}
+    {detail && <p className="session-detail">{detail}</p>}
   </div>;
 }

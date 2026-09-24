@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/prefer-tag-over-role, jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- Vendored shadcn input group: role=group labels a composite control, and the addon click only mirrors native label behaviour by focusing the adjacent input (keyboard users tab to the input directly). */
 'use client';
 
 import * as React from 'react';
